@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\OptimizationTask;
 use App\Services\FileOptimizationService;
+use App\Services\OptimizationLogger;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -24,10 +25,11 @@ class OptimizeFileJob implements ShouldQueue
         public OptimizationTask $task
     ) {}
 
-    public function handle(FileOptimizationService $optimizationService): void
+    public function handle(FileOptimizationService $optimizationService, OptimizationLogger $logger): void
     {
         try {
             Log::info("Starting optimization for task {$this->task->task_id}");
+            $logger->logTaskProcessingStarted($this->task);
             
             // Mark task as processing
             $this->task->markAsProcessing();
@@ -62,7 +64,7 @@ class OptimizeFileJob implements ShouldQueue
             if ($optimizationResult['optimized']) {
                 // Mark as completed with optimization data
                 $this->task->markAsCompleted([
-                    'optimized_path' => 'uploads/optimized/' . basename($this->task->original_path),
+                    'optimized_path' => $this->task->generateOptimizedPath(),
                     'optimized_size' => $optimizationResult['optimized_size'],
                     'compression_ratio' => $optimizationResult['compression_ratio'],
                     'size_reduction' => $optimizationResult['size_reduction'],
@@ -71,12 +73,16 @@ class OptimizeFileJob implements ShouldQueue
                 ]);
 
                 Log::info("Optimization completed for task {$this->task->task_id}");
+                $logger->logTaskCompleted($this->task, $optimizationResult);
             } else {
-                throw new \Exception($optimizationResult['reason'] ?? 'Optimization failed');
+                $errorMessage = $optimizationResult['reason'] ?? 'Optimization failed';
+                $logger->logTaskFailed($this->task, $errorMessage);
+                throw new \Exception($errorMessage);
             }
 
         } catch (\Exception $e) {
             Log::error("Optimization failed for task {$this->task->task_id}: {$e->getMessage()}");
+            $logger->logTaskFailed($this->task, $e->getMessage(), $e);
             $this->task->markAsFailed($e->getMessage());
             throw $e;
         }
@@ -85,6 +91,11 @@ class OptimizeFileJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         Log::error("Job failed for task {$this->task->task_id}: {$exception->getMessage()}");
+        
+        // Log the final failure
+        $logger = app(OptimizationLogger::class);
+        $logger->logTaskFailed($this->task, $exception->getMessage(), $exception);
+        
         $this->task->markAsFailed($exception->getMessage());
     }
 } 

@@ -127,6 +127,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'optimization' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/optimization.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_OPTIMIZATION_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

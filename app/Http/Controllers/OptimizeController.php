@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\OptimizeFileJob;
 use App\Models\OptimizationTask;
 use App\Services\FileOptimizationService;
+use App\Services\OptimizationLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,7 +17,8 @@ class OptimizeController extends Controller
      * Create a new controller instance.
      */
     public function __construct(
-        private FileOptimizationService $optimizationService
+        private FileOptimizationService $optimizationService,
+        private OptimizationLogger $logger
     ) {}
 
     /**
@@ -48,6 +50,9 @@ class OptimizeController extends Controller
             'original_size' => $originalSize,
             'quality' => $quality,
         ]);
+
+        // Log task creation
+        $this->logger->logTaskCreated($task);
 
         // Dispatch the optimization job
         OptimizeFileJob::dispatch($task);
@@ -158,6 +163,9 @@ class OptimizeController extends Controller
         // Get file path and name for download
         $filePath = Storage::disk('public')->path($task->optimized_path);
         $optimizedFileName = $task->getOptimizedFilename();
+
+        // Log the download
+        $this->logger->logTaskDownloaded($task);
 
         // Clean up the original file and task record immediately
         // (optimized file will be deleted by Laravel after download)
