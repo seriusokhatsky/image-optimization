@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\OptimizeFileJob;
+use App\Models\OptimizationTask;
 use App\Services\FileOptimizationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,21 +20,17 @@ class OptimizeController extends Controller
     ) {}
 
     /**
-     * Optimize an uploaded file.
-     *
-     * @param Request $request The HTTP request containing the file
-     * @return JsonResponse The optimization result
+     * Submit a file for optimization (async)
      */
-    public function optimize(Request $request): JsonResponse
+    public function submit(Request $request): JsonResponse
     {
-        // Validate the file upload and quality parameter
         $request->validate([
             'file' => 'required|file|max:10240', // 10MB max
-            'quality' => 'nullable|integer|min:1|max:100', // Quality from 1-100
+            'quality' => 'nullable|integer|min:1|max:100',
         ]);
 
         $file = $request->file('file');
-        $quality = $request->input('quality', 80); // Default quality is 80
+        $quality = $request->input('quality', 80);
         $originalName = $file->getClientOriginalName();
         $originalSize = $file->getSize();
         $extension = $file->getClientOriginalExtension();
@@ -43,59 +41,164 @@ class OptimizeController extends Controller
         // Store the original file
         $originalPath = $file->storeAs('uploads/original', $uniqueName, 'public');
 
-        // Use optimization service with the original file path and quality
-        $optimizationResult = $this->optimizationService->optimize($file, $extension, $originalPath, $quality);
+        // Create optimization task
+        $task = OptimizationTask::create([
+            'original_filename' => $originalName,
+            'original_path' => $originalPath,
+            'original_size' => $originalSize,
+            'quality' => $quality,
+        ]);
 
-        // Determine optimized file size and metrics
-        if ($optimizationResult['optimized']) {
-            $optimizedSize = $optimizationResult['optimized_size'];
-            $compressionRatio = $optimizationResult['compression_ratio'];
-            $sizeReduction = $optimizationResult['size_reduction'];
-        } else {
-            // If optimization failed, use original size as fallback
-            $optimizedSize = $originalSize;
-            $compressionRatio = 0;
-            $sizeReduction = 0;
-        }
+        // Dispatch the optimization job
+        OptimizeFileJob::dispatch($task);
 
-        $optimizedPath = 'uploads/optimized/' . $uniqueName;
-
-        // Prepare the response
-        $result = [
-            'success' => $optimizationResult['optimized'],
-            'message' => $optimizationResult['optimized'] 
-                ? 'File optimized successfully' 
-                : 'File uploaded but optimization failed',
+        return response()->json([
+            'success' => true,
+            'message' => 'File uploaded successfully. Optimization in progress.',
             'data' => [
+                'task_id' => $task->task_id,
+                'status' => 'pending',
                 'original_file' => [
                     'name' => $originalName,
                     'size' => $originalSize,
-                    'path' => $originalPath,
                 ],
-                'optimized_file' => [
-                    'name' => 'optimized_' . $originalName,
-                    'size' => $optimizedSize,
-                    'path' => $optimizedPath,
+                'estimated_completion' => now()->addMinutes(2)->toISOString(),
+            ],
+        ], 202); // 202 Accepted
+    }
+
+    /**
+     * Check the status of an optimization task
+     */
+    public function status(string $taskId): JsonResponse
+    {
+        $task = OptimizationTask::where('task_id', $taskId)->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found',
+            ], 404);
+        }
+
+        if ($task->isExpired()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task has expired',
+            ], 410); // 410 Gone
+        }
+
+        $response = [
+            'success' => true,
+            'data' => [
+                'task_id' => $task->task_id,
+                'status' => $task->status,
+                'original_file' => [
+                    'name' => $task->original_filename,
+                    'size' => $task->original_size,
                 ],
-                'optimization' => [
-                    'compression_ratio' => $compressionRatio,
-                    'size_reduction' => $sizeReduction,
-                    'algorithm' => $optimizationResult['algorithm'],
-                    'processing_time' => $optimizationResult['processing_time'],
-                    'optimized' => $optimizationResult['optimized'],
-                ],
-                'storage' => [
-                    'original_url' => Storage::disk('public')->url($originalPath),
-                    'optimized_url' => Storage::disk('public')->url($optimizedPath),
-                ],
+                'created_at' => $task->created_at->toISOString(),
             ],
         ];
 
-        // Add failure reason if optimization failed
-        if (!$optimizationResult['optimized'] && isset($optimizationResult['reason'])) {
-            $result['data']['optimization']['failure_reason'] = $optimizationResult['reason'];
+        if ($task->status === 'processing') {
+            $response['data']['started_at'] = $task->started_at?->toISOString();
         }
 
-        return response()->json($result);
+        if ($task->status === 'completed') {
+            $response['data']['optimization'] = [
+                'compression_ratio' => $task->compression_ratio,
+                'size_reduction' => $task->size_reduction,
+                'algorithm' => $task->algorithm,
+                'processing_time' => $task->processing_time . ' ms',
+                'optimized_size' => $task->optimized_size,
+            ];
+            $response['data']['completed_at'] = $task->completed_at->toISOString();
+            $response['data']['download_url'] = route('optimize.download', $task->task_id);
+        }
+
+        if ($task->status === 'failed') {
+            $response['data']['error'] = $task->error_message;
+            $response['data']['completed_at'] = $task->completed_at->toISOString();
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * Download the optimized file
+     */
+    public function download(string $taskId)
+    {
+        $task = OptimizationTask::where('task_id', $taskId)
+            ->where('status', 'completed')
+            ->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or not completed',
+            ], 404);
+        }
+
+        if ($task->isExpired()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task has expired',
+            ], 410);
+        }
+
+        if (!Storage::disk('public')->exists($task->optimized_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Optimized file not found',
+            ], 404);
+        }
+
+        // Get file path and name for download
+        $filePath = Storage::disk('public')->path($task->optimized_path);
+        $optimizedFileName = $task->getOptimizedFilename();
+
+        // Clean up the original file and task record immediately
+        // (optimized file will be deleted by Laravel after download)
+        Storage::disk('public')->delete($task->original_path);
+        $task->delete();
+
+        // Download the file and auto-delete it after sending
+        return response()->download($filePath, $optimizedFileName)->deleteFileAfterSend();
+    }
+
+    /**
+     * Clean up task and associated files (used for expired tasks)
+     */
+    private function scheduleTaskCleanup(OptimizationTask $task): void
+    {
+        // Delete files
+        Storage::disk('public')->delete($task->original_path);
+        if ($task->optimized_path) {
+            Storage::disk('public')->delete($task->optimized_path);
+        }
+
+        // Delete task record
+        $task->delete();
+    }
+
+    /**
+     * Legacy endpoint for backward compatibility (sync)
+     * This maintains the original behavior for existing clients
+     */
+    public function optimize(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'This endpoint is deprecated. Please use /api/optimize/submit for async processing.',
+            'migration_info' => [
+                'new_endpoints' => [
+                    'submit' => 'POST /api/optimize/submit - Submit file for async optimization',
+                    'status' => 'GET /api/optimize/status/{taskId} - Check optimization status',
+                    'download' => 'GET /api/optimize/download/{taskId} - Download optimized file'
+                ]
+            ]
+        ], 410);
     }
 } 
