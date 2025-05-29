@@ -3,6 +3,10 @@
 This Laravel app is built to provide an API for image optimization. It is built inside docker with extra software installed for image optimizations.
 
 
+## Docker
+We run the app in docker using Laravel Sail. All the commands should use sail. Example:
+`sail artisan migrate` instead of `php artisan migrate`
+
 ### What is customized in original docker sail image?
 
 Add a few commands to the `docker/8.4/Dockerfile`
