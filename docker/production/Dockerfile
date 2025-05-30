@@ -107,10 +107,10 @@ RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 
 # Create application user (handle existing www-data user)
 RUN if id "www-data" &>/dev/null; then \
-        userdel www-data; \
+        userdel www-data 2>/dev/null || true; \
     fi && \
     if getent group www-data &>/dev/null; then \
-        groupdel www-data; \
+        groupdel www-data 2>/dev/null || true; \
     fi && \
     groupadd -g $WWWGROUP www-data && \
     useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER www-data
