@@ -6,8 +6,6 @@ services:
     image: 'optimizer-app:production'
     container_name: optimizer-app
     restart: unless-stopped
-    ports:
-      - '80:80'
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
