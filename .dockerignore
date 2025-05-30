@@ -57,5 +57,4 @@ Thumbs.db
 /vendor/
 
 # Development dependencies
-package-lock.json
 composer.lock 

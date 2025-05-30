@@ -127,7 +127,7 @@ RUN chown -R www-data:www-data /var/www/html \
 RUN cd /var/www/html && composer install --optimize-autoloader --no-dev --no-interaction --no-progress --prefer-dist
 
 # Install and build frontend assets
-RUN cd /var/www/html && npm ci --only=production && npm run build && rm -rf node_modules
+RUN cd /var/www/html && npm ci --omit=dev && npm run build && rm -rf node_modules
 
 # Copy production configuration files
 COPY docker/production/php.ini /etc/php/8.4/cli/conf.d/99-production.ini
