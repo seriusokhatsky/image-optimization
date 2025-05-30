@@ -4,14 +4,10 @@ set -e
 
 # Production container startup script
 
-# Ensure log directories exist
-mkdir -p /var/log/supervisor
-mkdir -p /var/log/php
-
-# Set proper permissions for Laravel directories
-if [ -d "/var/www/html/storage" ]; then
-    chown -R www-data:www-data /var/www/html/storage
-    chmod -R 775 /var/www/html/storage
+# Ensure application log directories exist with proper permissions
+if [ -d "/var/www/html/storage/logs" ]; then
+    chown -R www-data:www-data /var/www/html/storage/logs
+    chmod -R 775 /var/www/html/storage/logs
 fi
 
 if [ -d "/var/www/html/bootstrap/cache" ]; then

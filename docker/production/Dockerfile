@@ -137,6 +137,11 @@ COPY docker/production/start-container /usr/local/bin/start-container
 
 RUN chmod +x /usr/local/bin/start-container
 
+# Create log directories with proper permissions
+RUN mkdir -p /var/log/supervisor /var/log/php && \
+    chown -R www-data:www-data /var/log/supervisor /var/log/php && \
+    chmod -R 775 /var/log/supervisor /var/log/php
+
 # Cache Laravel configuration
 RUN cd /var/www/html && php artisan config:cache && php artisan route:cache && php artisan view:cache
 
