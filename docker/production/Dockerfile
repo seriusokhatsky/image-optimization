@@ -2,8 +2,8 @@ FROM ubuntu:24.04
 
 LABEL maintainer="Laravel Optimizer Production"
 
-ARG WWWGROUP=1000
-ARG WWWUSER=1000
+ARG WWWGROUP=1337
+ARG WWWUSER=1337
 ARG NODE_VERSION=22
 ARG MYSQL_CLIENT="mysql-client"
 
@@ -105,9 +105,12 @@ RUN apt-get -y autoremove \
 # Set PHP capabilities
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 
-# Create application user (simplified approach)
+# Create application user (handle GID conflicts)
 RUN userdel www-data 2>/dev/null || true && \
     groupdel www-data 2>/dev/null || true && \
+    if getent group 1000 &>/dev/null; then \
+        groupmod -g 1001 $(getent group 1000 | cut -d: -f1) 2>/dev/null || true; \
+    fi && \
     groupadd -g $WWWGROUP www-data && \
     useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER www-data
 
