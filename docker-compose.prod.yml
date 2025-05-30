@@ -1,0 +1,78 @@
+services:
+  app:
+    build:
+      context: '.'
+      dockerfile: docker/production/Dockerfile
+    image: 'optimizer-app:production'
+    container_name: optimizer-app
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - './storage/app:/var/www/html/storage/app'
+      - './storage/logs:/var/www/html/storage/logs'
+      - 'app-cache:/var/www/html/bootstrap/cache'
+    networks:
+      - optimizer-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: 'mysql/mysql-server:8.0'
+    container_name: optimizer-mysql
+    restart: unless-stopped
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_DATABASE: '${DB_DATABASE}'
+      MYSQL_USER: '${DB_USERNAME}'
+      MYSQL_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 0
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+      - './docker/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+    networks:
+      - optimizer-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
+      retries: 3
+      timeout: 5s
+      interval: 30s
+
+  nginx:
+    image: 'nginx:alpine'
+    container_name: optimizer-nginx
+    restart: unless-stopped
+    ports:
+      - '443:443'
+    volumes:
+      - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf'
+      - './docker/nginx/ssl:/etc/nginx/ssl'
+      - './public:/var/www/html/public'
+    networks:
+      - optimizer-network
+    depends_on:
+      - app
+
+networks:
+  optimizer-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  app-cache:
+    driver: local 

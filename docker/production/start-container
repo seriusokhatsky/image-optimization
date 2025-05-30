@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Production container startup script
+
+# Ensure log directories exist
+mkdir -p /var/log/supervisor
+mkdir -p /var/log/php
+
+# Set proper permissions for Laravel directories
+if [ -d "/var/www/html/storage" ]; then
+    chown -R www-data:www-data /var/www/html/storage
+    chmod -R 775 /var/www/html/storage
+fi
+
+if [ -d "/var/www/html/bootstrap/cache" ]; then
+    chown -R www-data:www-data /var/www/html/bootstrap/cache
+    chmod -R 775 /var/www/html/bootstrap/cache
+fi
+
+# Validate environment
+if [ -z "$APP_KEY" ]; then
+    echo "ERROR: APP_KEY environment variable is not set!"
+    exit 1
+fi
+
+# Run Laravel optimizations if not already done
+if [ ! -f "/var/www/html/bootstrap/cache/config.php" ]; then
+    echo "Running Laravel optimizations..."
+    cd /var/www/html
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+fi
+
+# Execute command or start supervisor
+if [ $# -gt 0 ]; then
+    exec "$@"
+else
+    echo "Starting production Laravel application..."
+    exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+fi 
