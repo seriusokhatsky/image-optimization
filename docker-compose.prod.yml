@@ -61,8 +61,8 @@ services:
       - 'ssl-certs:/etc/nginx/ssl'
     networks:
       - optimizer-network
-    depends_on:
-      - app
+    # depends_on:
+    #   - app
     command: |
       sh -c "
         # Create nginx config
