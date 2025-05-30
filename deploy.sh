@@ -82,7 +82,7 @@ deploy_to_server() {
         fi
         
         # Check Docker Compose installation (skip if already installed)
-        if ! command -v docker-compose &> /dev/null; then
+        if ! command -v docker compose &> /dev/null; then
             echo "⚠️  Docker Compose not found. Installing Docker Compose..."
             curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
             chmod +x /usr/local/bin/docker-compose
@@ -93,7 +93,7 @@ deploy_to_server() {
         # Verify Docker is working
         echo "🔍 Verifying Docker installation..."
         docker --version
-        docker-compose --version
+        docker compose --version
         
         # Clone or update repository
         if [ ! -d "$PROJECT_DIR" ]; then
@@ -133,11 +133,11 @@ ENVEOF
         
         # Stop existing containers gracefully
         echo "🛑 Stopping existing containers..."
-        docker-compose -f docker-compose.prod.yml down || true
+        docker compose -f docker-compose.prod.yml down || true
         
         # Build and deploy
         echo "🏗️  Building and starting containers..."
-        docker-compose -f docker-compose.prod.yml up -d --build
+        docker compose -f docker-compose.prod.yml up -d --build
         
         # Wait for containers to be ready
         echo "⏳ Waiting for containers to be ready..."
@@ -147,20 +147,20 @@ ENVEOF
         echo "🎯 Setting up Laravel..."
         
         # Generate app key if not set
-        if ! docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --show | grep -q "base64:"; then
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
+        if ! docker compose -f docker-compose.prod.yml exec -T app php artisan key:generate --show | grep -q "base64:"; then
+            docker compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
         fi
         
         # Run migrations
-        docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+        docker compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
         
         # Clear and optimize
-        docker-compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
-        docker-compose -f docker-compose.prod.yml exec -T app php artisan optimize
+        docker compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
+        docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
         
         echo "✅ Deployment completed successfully!"
         echo "📊 Container status:"
-        docker-compose -f docker-compose.prod.yml ps
+        docker compose -f docker-compose.prod.yml ps
 ENDSSH
 
     print_status "Deployment completed!"
