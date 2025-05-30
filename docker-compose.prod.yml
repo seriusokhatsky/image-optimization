@@ -60,7 +60,7 @@ services:
     volumes:
       - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf'
       - './docker/nginx/ssl:/etc/nginx/ssl'
-      - './public:/var/www/html/public'
+      # - './public:/var/www/html/public'
     networks:
       - optimizer-network
     depends_on:
