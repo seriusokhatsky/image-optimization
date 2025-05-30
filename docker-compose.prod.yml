@@ -54,11 +54,9 @@ services:
     container_name: optimizer-nginx
     restart: unless-stopped
     ports:
-      - '443:443'
       - '80:80'
     volumes:
       - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
-      - 'ssl-certs:/etc/nginx/ssl'
     networks:
       - optimizer-network
 
@@ -70,6 +68,4 @@ volumes:
   mysql-data:
     driver: local
   app-cache:
-    driver: local
-  ssl-certs:
     driver: local 
