@@ -107,9 +107,12 @@ RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 
 # Create application user (handle existing www-data user)
 RUN if id "www-data" &>/dev/null; then \
-        userdel -r www-data; \
+        userdel www-data; \
     fi && \
-    groupadd --force -g $WWWGROUP www-data && \
+    if getent group www-data &>/dev/null; then \
+        groupdel www-data; \
+    fi && \
+    groupadd -g $WWWGROUP www-data && \
     useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER www-data
 
 # Copy application files
