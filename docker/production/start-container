@@ -4,21 +4,6 @@ set -e
 
 # Production container startup script
 
-# Ensure application log directories exist with proper permissions
-if [ -d "/var/www/html/storage/logs" ]; then
-    if [ -w "/var/www/html/storage/logs" ]; then
-        chown -R www-data:www-data /var/www/html/storage/logs 2>/dev/null || true
-        chmod -R 775 /var/www/html/storage/logs 2>/dev/null || true
-    fi
-fi
-
-if [ -d "/var/www/html/bootstrap/cache" ]; then
-    if [ -w "/var/www/html/bootstrap/cache" ]; then
-        chown -R www-data:www-data /var/www/html/bootstrap/cache 2>/dev/null || true
-        chmod -R 775 /var/www/html/bootstrap/cache 2>/dev/null || true
-    fi
-fi
-
 # Create cache directories if they don't exist
 mkdir -p /var/www/html/bootstrap/cache
 mkdir -p /var/www/html/storage/logs
