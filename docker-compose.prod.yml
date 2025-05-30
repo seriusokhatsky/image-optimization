@@ -57,14 +57,60 @@ services:
     restart: unless-stopped
     ports:
       - '443:443'
+      - '80:80'
     volumes:
-      - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf'
-      - './docker/nginx/ssl:/etc/nginx/ssl'
-      # - './public:/var/www/html/public'
+      - 'nginx-config:/etc/nginx'
+      - 'ssl-certs:/etc/nginx/ssl'
     networks:
       - optimizer-network
     depends_on:
       - app
+    command: |
+      sh -c "
+        # Create nginx config
+        mkdir -p /etc/nginx/ssl
+        cat > /etc/nginx/nginx.conf << 'EOF'
+        events {
+            worker_connections 1024;
+        }
+        
+        http {
+            include /etc/nginx/mime.types;
+            default_type application/octet-stream;
+            sendfile on;
+            keepalive_timeout 65;
+        
+            upstream app {
+                server app:80;
+            }
+        
+            server {
+                listen 443 ssl;
+                server_name img-optim.xtemos.com;
+        
+                ssl_certificate /etc/nginx/ssl/cert.pem;
+                ssl_certificate_key /etc/nginx/ssl/key.pem;
+        
+                location / {
+                    proxy_pass http://app;
+                    proxy_set_header Host \$$host;
+                    proxy_set_header X-Real-IP \$$remote_addr;
+                    proxy_set_header X-Forwarded-For \$$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$$scheme;
+                }
+            }
+        
+            server {
+                listen 80;
+                server_name img-optim.xtemos.com;
+                return 301 https://\$$server_name\$$request_uri;
+            }
+        }
+        EOF
+        
+        # Start nginx
+        nginx -g 'daemon off;'
+      "
 
 networks:
   optimizer-network:
@@ -74,4 +120,8 @@ volumes:
   mysql-data:
     driver: local
   app-cache:
+    driver: local
+  nginx-config:
+    driver: local
+  ssl-certs:
     driver: local 
