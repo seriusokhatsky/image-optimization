@@ -18,10 +18,10 @@ services:
       - DB_DATABASE=${DB_DATABASE}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
-    volumes:
-      - './storage/app:/var/www/html/storage/app'
-      - './storage/logs:/var/www/html/storage/logs'
-      - 'app-cache:/var/www/html/bootstrap/cache'
+    # volumes:
+      # - './storage/app:/var/www/html/storage/app'
+      # - './storage/logs:/var/www/html/storage/logs'
+      # - 'app-cache:/var/www/html/bootstrap/cache'
     networks:
       - optimizer-network
     depends_on:
