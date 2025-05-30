@@ -190,23 +190,4 @@ class OptimizeController extends Controller
         // Delete task record
         $task->delete();
     }
-
-    /**
-     * Legacy endpoint for backward compatibility (sync)
-     * This maintains the original behavior for existing clients
-     */
-    public function optimize(Request $request): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => 'This endpoint is deprecated. Please use /api/optimize/submit for async processing.',
-            'migration_info' => [
-                'new_endpoints' => [
-                    'submit' => 'POST /api/optimize/submit - Submit file for async optimization',
-                    'status' => 'GET /api/optimize/status/{taskId} - Check optimization status',
-                    'download' => 'GET /api/optimize/download/{taskId} - Download optimized file'
-                ]
-            ]
-        ], 410);
-    }
 } 
