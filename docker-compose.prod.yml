@@ -22,39 +22,39 @@ services:
       # - 'app-cache:/var/www/html/bootstrap/cache'
     networks:
       - optimizer-network
-    # depends_on:
-    #   mysql:
-    #     condition: service_healthy
+    depends_on:
+      mysql:
+        condition: service_healthy
 
-  # mysql:
-  #   image: 'mysql/mysql-server:8.0'
-  #   container_name: optimizer-mysql
-  #   restart: unless-stopped
-  #   ports:
-  #     - '3306:3306'
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
-  #     MYSQL_ROOT_HOST: '%'
-  #     MYSQL_DATABASE: '${DB_DATABASE}'
-  #     MYSQL_USER: '${DB_USERNAME}'
-  #     MYSQL_PASSWORD: '${DB_PASSWORD}'
-  #     MYSQL_ALLOW_EMPTY_PASSWORD: 0
-  #   volumes:
-  #     - 'mysql-data:/var/lib/mysql'
-  #   networks:
-  #     - optimizer-network
-  #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
-  #     retries: 3
-  #     timeout: 5s
-  #     interval: 30s
+  mysql:
+    image: 'mysql/mysql-server:8.0'
+    container_name: optimizer-mysql
+    restart: unless-stopped
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_DATABASE: '${DB_DATABASE}'
+      MYSQL_USER: '${DB_USERNAME}'
+      MYSQL_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 0
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+    networks:
+      - optimizer-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
+      retries: 3
+      timeout: 5s
+      interval: 30s
 
   nginx:
     image: 'nginx:alpine'
     container_name: optimizer-nginx
     restart: unless-stopped
     ports:
-      - '80:80'
+      - '85:80'
     volumes:
       - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
     networks:
