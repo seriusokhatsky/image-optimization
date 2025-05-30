@@ -89,7 +89,9 @@ RUN cd /tmp && \
     cd mozjpeg && \
     mkdir build && \
     cd build && \
-    cmake -DCMAKE_INSTALL_PREFIX=/usr/local .. && \
+    # === IMPORTANT CHANGE HERE ===
+    # Add -DBUILD_SHARED_LIBS=ON and -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && \
     make && \
     make install && \
     ldconfig && \
@@ -103,9 +105,12 @@ RUN apt-get -y autoremove \
 # Set PHP capabilities
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 
-# Create application user
-RUN groupadd --force -g $WWWGROUP www-data || true
-RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER www-data || usermod -u $WWWUSER www-data
+# Create application user (handle existing www-data user)
+RUN if id "www-data" &>/dev/null; then \
+        userdel -r www-data; \
+    fi && \
+    groupadd --force -g $WWWGROUP www-data && \
+    useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER www-data
 
 # Copy application files
 COPY . /var/www/html
