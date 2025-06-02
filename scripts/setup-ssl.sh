@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 DOMAIN="img-optim.xtemos.com"
-EMAIL="admin@xtemos.com"  # Change this to your email
+EMAIL="xtemos.studio@gmail.com"
 SSL_DIR="./docker/nginx/ssl"
 WEBROOT_PATH="./docker/nginx/webroot"
 

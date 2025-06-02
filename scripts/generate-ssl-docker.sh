@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 DOMAIN="img-optim.xtemos.com"
-EMAIL="adminer@xtemos.com"  # Change this to your email
+EMAIL="xtemos.studio@gmail.com"
 
 # Colors for output
 RED='\033[0;31m'
@@ -78,11 +78,11 @@ start_certbot_setup() {
 generate_certificate() {
     print_step "Generating Let's Encrypt certificate..."
     
-    # Update email in docker compose file
+    # Update email in docker-compose file command
     sed -i "s/admin@xtemos\.com/$EMAIL/g" docker-compose.ssl.yml
     
     # Run certbot
-    docker compose -f docker-compose.ssl.yml run --rm certbot
+    docker-compose -f docker-compose.ssl.yml run --rm certbot
     
     print_status "Certificate generated successfully"
 }
