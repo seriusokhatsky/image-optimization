@@ -82,7 +82,7 @@ generate_certificate() {
     sed -i "s/admin@xtemos\.com/$EMAIL/g" docker-compose.ssl.yml
     
     # Run certbot
-    docker-compose -f docker-compose.ssl.yml run --rm certbot
+    docker compose -f docker-compose.ssl.yml run --rm certbot
     
     print_status "Certificate generated successfully"
 }

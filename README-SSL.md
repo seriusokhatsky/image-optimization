@@ -50,7 +50,7 @@ If you prefer to set up certificates manually:
 ### Step 1: Stop Production Containers
 
 ```bash
-docker-compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml down
 ```
 
 ### Step 2: Install Certbot (if not using Docker)
@@ -98,7 +98,7 @@ sed -i 's|local-key\.pem|privkey.pem|g' docker/nginx/nginx.conf
 ### Step 6: Start Production
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## 🔄 Certificate Renewal
@@ -122,11 +122,11 @@ crontab -e
 ./scripts/renew-ssl.sh
 
 # Or manually with Docker
-docker-compose -f docker-compose.prod.yml down
-docker-compose -f docker-compose.ssl.yml up -d nginx-certbot
-docker-compose -f docker-compose.ssl.yml run --rm certbot renew
-docker-compose -f docker-compose.ssl.yml down
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.ssl.yml up -d nginx-certbot
+docker compose -f docker-compose.ssl.yml run --rm certbot renew
+docker compose -f docker-compose.ssl.yml down
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## 🔍 Testing & Verification
@@ -201,7 +201,7 @@ sudo certbot certificates
 Run certbot with debug output:
 
 ```bash
-docker-compose -f docker-compose.ssl.yml run --rm certbot certonly --webroot -w /var/www/html -d img-optim.xtemos.com --email your-email@example.com --agree-tos --non-interactive --expand --dry-run --verbose
+docker compose -f docker-compose.ssl.yml run --rm certbot certonly --webroot -w /var/www/html -d img-optim.xtemos.com --email your-email@example.com --agree-tos --non-interactive --expand --dry-run --verbose
 ```
 
 ## 📋 Certificate Information
@@ -235,7 +235,7 @@ rsync -av docker/nginx/ssl/ user@backup-server:/backups/ssl/
 
 If you encounter issues:
 
-1. Check the logs: `docker-compose -f docker-compose.ssl.yml logs certbot`
+1. Check the logs: `docker compose -f docker-compose.ssl.yml logs certbot`
 2. Verify DNS: `dig img-optim.xtemos.com`
 3. Test port access: `telnet your-server-ip 80`
 4. Check Let's Encrypt status: https://letsencrypt.status.io/
