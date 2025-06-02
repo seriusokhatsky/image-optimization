@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 DOMAIN="img-optim.xtemos.com"
-EMAIL="admin@xtemos.com"  # Change this to your email
+EMAIL="adminer@xtemos.com"  # Change this to your email
 
 # Colors for output
 RED='\033[0;31m'
