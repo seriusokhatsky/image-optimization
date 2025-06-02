@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  certbot:
+    image: certbot/certbot
+    container_name: optimizer-certbot
+    volumes:
+      - ./docker/nginx/ssl:/etc/letsencrypt
+      - ./docker/nginx/webroot:/var/www/html
+    environment:
+      - CERTBOT_EMAIL=admin@xtemos.com  # Change this to your email
+    command: >
+      sh -c "
+        certbot certonly --webroot 
+        -w /var/www/html 
+        -d img-optim.xtemos.com 
+        --email $${CERTBOT_EMAIL} 
+        --agree-tos 
+        --non-interactive 
+        --expand
+      "
+    networks:
+      - optimizer-network
+
+  nginx-certbot:
+    image: nginx:alpine
+    container_name: optimizer-nginx-certbot
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx-certbot.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/webroot:/var/www/html
+    networks:
+      - optimizer-network
+
+networks:
+  optimizer-network:
+    external: true 
