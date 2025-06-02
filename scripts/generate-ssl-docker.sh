@@ -53,7 +53,7 @@ setup_directories() {
 stop_production() {
     print_step "Stopping production containers..."
     
-    docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+    docker compose -f docker-compose.prod.yml down 2>/dev/null || true
     
     print_status "Production containers stopped"
 }
@@ -66,7 +66,7 @@ start_certbot_setup() {
     docker network create optimizer-network 2>/dev/null || true
     
     # Start nginx for verification
-    docker-compose -f docker-compose.ssl.yml up -d nginx-certbot
+    docker compose -f docker-compose.ssl.yml up -d nginx-certbot
     
     # Wait for nginx to be ready
     sleep 5
@@ -78,11 +78,11 @@ start_certbot_setup() {
 generate_certificate() {
     print_step "Generating Let's Encrypt certificate..."
     
-    # Update email in docker-compose file
+    # Update email in docker compose file
     sed -i "s/admin@xtemos\.com/$EMAIL/g" docker-compose.ssl.yml
     
     # Run certbot
-    docker-compose -f docker-compose.ssl.yml run --rm certbot
+    docker compose -f docker-compose.ssl.yml run --rm certbot
     
     print_status "Certificate generated successfully"
 }
@@ -122,7 +122,7 @@ update_nginx_config() {
 cleanup() {
     print_step "Cleaning up..."
     
-    docker-compose -f docker-compose.ssl.yml down 2>/dev/null || true
+    docker compose -f docker-compose.ssl.yml down 2>/dev/null || true
     
     print_status "Cleanup completed"
 }
@@ -131,7 +131,7 @@ cleanup() {
 start_production() {
     print_step "Starting production containers with new certificates..."
     
-    docker-compose -f docker-compose.prod.yml up -d
+    docker compose -f docker-compose.prod.yml up -d
     
     print_status "Production containers started"
 }
@@ -163,25 +163,25 @@ DOMAIN="img-optim.xtemos.com"
 echo "Starting certificate renewal..."
 
 # Stop production containers
-docker-compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml down
 
 # Create network if needed
 docker network create optimizer-network 2>/dev/null || true
 
 # Start verification setup
-docker-compose -f docker-compose.ssl.yml up -d nginx-certbot
+docker compose -f docker-compose.ssl.yml up -d nginx-certbot
 
 # Wait a moment
 sleep 5
 
 # Renew certificate
-docker-compose -f docker-compose.ssl.yml run --rm certbot renew
+docker compose -f docker-compose.ssl.yml run --rm certbot renew
 
 # Cleanup
-docker-compose -f docker-compose.ssl.yml down
+docker compose -f docker-compose.ssl.yml down
 
 # Start production
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 echo "Certificate renewal completed!"
 EOF

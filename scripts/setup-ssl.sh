@@ -121,7 +121,7 @@ generate_certificate() {
     
     # Stop nginx container if running
     print_status "Stopping nginx container..."
-    docker-compose -f docker-compose.prod.yml stop nginx 2>/dev/null || true
+    docker compose -f docker-compose.prod.yml stop nginx 2>/dev/null || true
     
     # Generate certificate using standalone mode
     certbot certonly \
@@ -183,7 +183,7 @@ setup_renewal() {
 #!/bin/bash
 
 # Stop nginx
-docker-compose -f /path/to/your/project/docker-compose.prod.yml stop nginx
+docker compose -f /path/to/your/project/docker-compose.prod.yml stop nginx
 
 # Renew certificate
 certbot renew --quiet
@@ -193,7 +193,7 @@ cp "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "/path/to/your/project/$SSL_DIR
 cp "/etc/letsencrypt/live/$DOMAIN/privkey.pem" "/path/to/your/project/$SSL_DIR/live/$DOMAIN/privkey.pem"
 
 # Restart nginx
-docker-compose -f /path/to/your/project/docker-compose.prod.yml start nginx
+docker compose -f /path/to/your/project/docker-compose.prod.yml start nginx
 
 echo "SSL certificates renewed and nginx restarted"
 EOF
@@ -244,7 +244,7 @@ main() {
     print_status "Automatic renewal is configured to run twice daily"
     print_status ""
     print_status "Next steps:"
-    print_status "1. Start your containers: docker-compose -f docker-compose.prod.yml up -d"
+    print_status "1. Start your containers: docker compose -f docker-compose.prod.yml up -d"
     print_status "2. Test your HTTPS site: https://$DOMAIN"
     print_status "3. Check certificate: https://www.ssllabs.com/ssltest/"
 }
