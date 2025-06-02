@@ -7,7 +7,7 @@ services:
       - ./docker/nginx/webroot:/var/www/html
     environment:
       - CERTBOT_EMAIL=admin@xtemos.com  # Change this to your email
-    command: certbot certonly --webroot -w /var/www/html -d img-optim.xtemos.com --email $${CERTBOT_EMAIL} --agree-tos --non-interactive --expand
+    command: certonly --webroot -w /var/www/html -d img-optim.xtemos.com --email $${CERTBOT_EMAIL} --agree-tos --non-interactive --expand
     networks:
       - optimizer-network
 
