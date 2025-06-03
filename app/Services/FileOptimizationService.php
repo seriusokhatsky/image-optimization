@@ -57,6 +57,12 @@ class FileOptimizationService
             $optimizedFileName = basename($originalPath);
             $optimizedPath = Storage::disk('public')->path('uploads/optimized/' . $optimizedFileName);
             
+            // Ensure the optimized directory exists
+            $optimizedDir = dirname($optimizedPath);
+            if (!is_dir($optimizedDir)) {
+                mkdir($optimizedDir, 0755, true);
+            }
+            
             // Copy original file to optimized location first
             copy($originalFilePath, $optimizedPath);
             
@@ -117,6 +123,12 @@ class FileOptimizationService
             $optimizedPath = Storage::disk('public')->path('uploads/optimized/' . $optimizedFileName);
             
             if (!file_exists($optimizedPath)) {
+                // Ensure the optimized directory exists
+                $optimizedDir = dirname($optimizedPath);
+                if (!is_dir($optimizedDir)) {
+                    mkdir($optimizedDir, 0755, true);
+                }
+                
                 copy($originalFilePath, $optimizedPath);
             }
             
