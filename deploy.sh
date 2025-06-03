@@ -147,8 +147,13 @@ ENVEOF
         echo "🎯 Setting up Laravel..."
         
         # Generate app key if not set
-        if ! docker compose -f docker-compose.prod.yml exec -T app php artisan key:generate --show | grep -q "base64:"; then
+        echo "🔑 Checking and generating APP_KEY..."
+        # Check if APP_KEY is empty or not set in .env
+        if ! grep -q "^APP_KEY=base64:" .env; then
+            echo "Generating new APP_KEY..."
             docker compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
+        else
+            echo "✅ APP_KEY is already set"
         fi
         
         # Run migrations
