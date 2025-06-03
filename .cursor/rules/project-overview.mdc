@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+This project is based on Laravel. It is an image optimization tool (API).
+It uses docker containers.
+Can be run locally and in the production.
