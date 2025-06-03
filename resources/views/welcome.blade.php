@@ -110,6 +110,52 @@
                             </span>
                         </li>
                     </ul>
+                    
+                    {{-- Latest Tasks Section --}}
+                    @if(isset($latestTasks) && $latestTasks->count() > 0)
+                        <div class="mt-6 mb-4">
+                            <h2 class="mb-3 font-medium text-[#1b1b18] dark:text-[#EDEDEC]">Latest Optimization Tasks ({{ $latestTasks->count() }})</h2>
+                            <div class="space-y-2 max-h-60 overflow-y-auto">
+                                @foreach($latestTasks as $task)
+                                    <div class="flex items-center justify-between p-3 bg-[#FDFDFC] dark:bg-[#0a0a0a] border border-[#e3e3e0] dark:border-[#3E3E3A] rounded-sm text-xs">
+                                        <div class="flex-1">
+                                            <div class="font-medium text-[#1b1b18] dark:text-[#EDEDEC] truncate">
+                                                {{ $task->original_filename }}
+                                            </div>
+                                            <div class="text-[#706f6c] dark:text-[#A1A09A] mt-1">
+                                                {{ number_format($task->original_size / 1024, 1) }} KB
+                                                @if($task->status === 'completed' && $task->optimized_size)
+                                                    → {{ number_format($task->optimized_size / 1024, 1) }} KB 
+                                                    ({{ $task->compression_ratio }}% saved)
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <div class="ml-3 flex flex-col items-end">
+                                            <span class="px-2 py-1 text-xs rounded-full
+                                                @if($task->status === 'completed') bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                                                @elseif($task->status === 'processing') bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                                                @elseif($task->status === 'failed') bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                                                @else bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200
+                                                @endif">
+                                                {{ ucfirst($task->status) }}
+                                            </span>
+                                            <div class="text-[10px] text-[#706f6c] dark:text-[#A1A09A] mt-1">
+                                                {{ $task->created_at->diffForHumans() }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @else
+                        <div class="mt-6 mb-4">
+                            <h2 class="mb-3 font-medium text-[#1b1b18] dark:text-[#EDEDEC]">Latest Optimization Tasks</h2>
+                            <div class="p-4 bg-[#FDFDFC] dark:bg-[#0a0a0a] border border-[#e3e3e0] dark:border-[#3E3E3A] rounded-sm text-center">
+                                <p class="text-[#706f6c] dark:text-[#A1A09A] text-sm">No tasks found. Start optimizing some images!</p>
+                            </div>
+                        </div>
+                    @endif
+                    
                     <ul class="flex gap-3 text-sm leading-normal">
                         <li>
                             <a href="https://cloud.laravel.com" target="_blank" class="inline-block dark:bg-[#eeeeec] dark:border-[#eeeeec] dark:text-[#1C1C1A] dark:hover:bg-white dark:hover:border-white hover:bg-black hover:border-black px-5 py-1.5 bg-[#1b1b18] rounded-sm border border-black text-white text-sm leading-normal">
