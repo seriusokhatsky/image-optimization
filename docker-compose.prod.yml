@@ -60,6 +60,8 @@ services:
       - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
     networks:
       - optimizer-network
+    depends_on:
+      - app
 
 networks:
   optimizer-network:
