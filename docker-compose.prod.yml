@@ -58,6 +58,7 @@ services:
       - '443:443'
     volumes:
       - './docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
+      - '/etc/nginx/ssl:/etc/nginx/ssl:ro'
     networks:
       - optimizer-network
     depends_on:
