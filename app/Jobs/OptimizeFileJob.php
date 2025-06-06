@@ -72,6 +72,35 @@ class OptimizeFileJob implements ShouldQueue
                     'processing_time' => $optimizationResult['processing_time'],
                 ]);
 
+                // Try to generate WebP copy if supported
+                $mimeType = $uploadedFile->getMimeType();
+                if ($optimizationService->supportsWebpConversion($mimeType)) {
+                    Log::info("Generating WebP copy for task {$this->task->task_id}");
+                    
+                    $webpResult = $optimizationService->generateWebpCopy(
+                        $this->task->optimized_path,
+                        $mimeType,
+                        $this->task->quality
+                    );
+
+                    if ($webpResult['success']) {
+                        $this->task->updateWebpData([
+                            'webp_path' => $webpResult['webp_path'],
+                            'webp_size' => $webpResult['webp_size'],
+                            'webp_compression_ratio' => $webpResult['webp_compression_ratio'],
+                            'webp_size_reduction' => $webpResult['webp_size_reduction'],
+                            'webp_processing_time' => $webpResult['webp_processing_time'],
+                            'webp_generated' => true,
+                        ]);
+                        
+                        Log::info("WebP copy generated successfully for task {$this->task->task_id}");
+                    } else {
+                        Log::warning("WebP generation failed for task {$this->task->task_id}: " . ($webpResult['reason'] ?? 'Unknown error'));
+                    }
+                } else {
+                    Log::info("WebP conversion not supported for MIME type {$mimeType} in task {$this->task->task_id}");
+                }
+
                 Log::info("Optimization completed for task {$this->task->task_id}");
                 $logger->logTaskCompleted($this->task, $optimizationResult);
             } else {

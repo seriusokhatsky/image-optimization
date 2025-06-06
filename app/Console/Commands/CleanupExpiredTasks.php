@@ -26,6 +26,9 @@ class CleanupExpiredTasks extends Command
             if ($task->optimized_path) {
                 Storage::disk('public')->delete($task->optimized_path);
             }
+            if ($task->webp_path) {
+                Storage::disk('public')->delete($task->webp_path);
+            }
             
             // Delete task
             $task->delete();

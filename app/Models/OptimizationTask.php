@@ -13,13 +13,19 @@ class OptimizationTask extends Model
         'original_filename',
         'original_path',
         'optimized_path',
+        'webp_path',
         'original_size',
         'optimized_size',
+        'webp_size',
         'quality',
         'compression_ratio',
+        'webp_compression_ratio',
         'size_reduction',
+        'webp_size_reduction',
         'algorithm',
         'processing_time',
+        'webp_processing_time',
+        'webp_generated',
         'error_message',
         'started_at',
         'completed_at',
@@ -31,7 +37,10 @@ class OptimizationTask extends Model
         'completed_at' => 'datetime',
         'expires_at' => 'datetime',
         'compression_ratio' => 'decimal:2',
+        'webp_compression_ratio' => 'decimal:2',
         'processing_time' => 'string',
+        'webp_processing_time' => 'string',
+        'webp_generated' => 'boolean',
     ];
 
     protected static function boot()
@@ -115,5 +124,41 @@ class OptimizationTask extends Model
         $filename = basename($this->original_path); // Keep the UUID filename for storage
         
         return $directory . '/' . $filename;
+    }
+
+    /**
+     * Generate the WebP filename based on original filename
+     * Example: my_cat.jpeg -> my_cat.jpeg.webp
+     */
+    public function getWebpFilename(): string
+    {
+        return $this->original_filename . '.webp';
+    }
+
+    /**
+     * Generate the WebP file path for storage
+     * Uses UUID for actual storage but maintains filename structure
+     */
+    public function generateWebpPath(): string
+    {
+        $directory = 'uploads/webp';
+        $filename = basename($this->original_path);
+        
+        return $directory . '/' . $filename . '.webp';
+    }
+
+    /**
+     * Update task with WebP generation data
+     */
+    public function updateWebpData(array $webpData): void
+    {
+        $this->update([
+            'webp_path' => $webpData['webp_path'],
+            'webp_size' => $webpData['webp_size'],
+            'webp_compression_ratio' => $webpData['webp_compression_ratio'],
+            'webp_size_reduction' => $webpData['webp_size_reduction'],
+            'webp_processing_time' => $webpData['webp_processing_time'],
+            'webp_generated' => $webpData['webp_generated'],
+        ]);
     }
 } 

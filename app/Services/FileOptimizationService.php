@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Services\Optimizers\MozjpegOptimizer;
+use App\Services\WebpConverterService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\ImageOptimizer\OptimizerChain;
@@ -16,11 +17,13 @@ use Spatie\ImageOptimizer\Optimizers\Svgo;
 class FileOptimizationService
 {
     private $optimizerChain;
+    private WebpConverterService $webpConverter;
 
     public function __construct()
     {
         // Create the base optimizer chain (we'll set specific optimizers per file type)
         $this->optimizerChain = OptimizerChainFactory::create();
+        $this->webpConverter = new WebpConverterService();
     }
 
     /**
@@ -248,5 +251,65 @@ class FileOptimizationService
     public function isSupported(string $extension): bool
     {
         return array_key_exists(strtolower($extension), $this->getSupportedTypes());
+    }
+
+    /**
+     * Generate WebP copy of an optimized image.
+     *
+     * @param string $optimizedPath Path to the optimized image
+     * @param string $mimeType MIME type of the source image
+     * @param int $quality WebP quality (1-100)
+     * @return array WebP generation result data
+     */
+    public function generateWebpCopy(string $optimizedPath, string $mimeType, int $quality = 80): array
+    {
+        // Check if WebP conversion is supported for this MIME type
+        if (!$this->webpConverter->canConvertToWebp($mimeType)) {
+            return [
+                'success' => false,
+                'reason' => 'File type not supported for WebP conversion',
+                'webp_generated' => false
+            ];
+        }
+
+        // Generate WebP file path
+        $webpPath = $this->webpConverter->generateWebpPath($optimizedPath);
+        $webpFullPath = Storage::disk('public')->path($webpPath);
+
+        // Convert to WebP
+        $result = $this->webpConverter->convertToWebp(
+            Storage::disk('public')->path($optimizedPath),
+            $webpFullPath,
+            $quality
+        );
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'webp_path' => $webpPath,
+                'webp_size' => $result['webp_size'],
+                'webp_compression_ratio' => $result['compression_ratio'],
+                'webp_size_reduction' => $result['size_reduction'],
+                'webp_processing_time' => $result['processing_time'],
+                'webp_generated' => true
+            ];
+        } else {
+            return [
+                'success' => false,
+                'reason' => $result['error'],
+                'webp_generated' => false
+            ];
+        }
+    }
+
+    /**
+     * Check if file type is supported for WebP conversion.
+     *
+     * @param string $mimeType File MIME type
+     * @return bool Whether the file type supports WebP conversion
+     */
+    public function supportsWebpConversion(string $mimeType): bool
+    {
+        return $this->webpConverter->canConvertToWebp($mimeType);
     }
 } 

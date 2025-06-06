@@ -91,15 +91,23 @@ class OptimizationLogger
     /**
      * Log task download
      */
-    public function logTaskDownloaded(OptimizationTask $task): void
+    public function logTaskDownloaded(OptimizationTask $task, string $fileType = 'optimized'): void
     {
-        $this->logger->info('TASK_DOWNLOADED', [
+        $logData = [
             'task_id' => $task->task_id,
             'original_filename' => $task->original_filename,
-            'optimized_filename' => $task->getOptimizedFilename(),
+            'file_type' => $fileType,
             'downloaded_at' => now()->toISOString(),
             'task_cleanup' => 'SCHEDULED',
-        ]);
+        ];
+
+        if ($fileType === 'webp') {
+            $logData['webp_filename'] = $task->getWebpFilename();
+        } else {
+            $logData['optimized_filename'] = $task->getOptimizedFilename();
+        }
+
+        $this->logger->info('TASK_DOWNLOADED', $logData);
     }
 
     /**

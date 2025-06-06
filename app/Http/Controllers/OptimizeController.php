@@ -118,6 +118,18 @@ class OptimizeController extends Controller
                 'processing_time' => $task->processing_time . ' ms',
                 'optimized_size' => $task->optimized_size,
             ];
+            
+            // Include WebP information if generated
+            if ($task->webp_generated) {
+                $response['data']['webp'] = [
+                    'compression_ratio' => $task->webp_compression_ratio,
+                    'size_reduction' => $task->webp_size_reduction,
+                    'processing_time' => $task->webp_processing_time,
+                    'webp_size' => $task->webp_size,
+                ];
+                $response['data']['webp_download_url'] = route('optimize.download.webp', $task->task_id);
+            }
+            
             $response['data']['completed_at'] = $task->completed_at->toISOString();
             $response['data']['download_url'] = route('optimize.download', $task->task_id);
         }
@@ -170,10 +182,55 @@ class OptimizeController extends Controller
         // Clean up the original file and task record immediately
         // (optimized file will be deleted by Laravel after download)
         Storage::disk('public')->delete($task->original_path);
+        if ($task->webp_path) {
+            Storage::disk('public')->delete($task->webp_path);
+        }
         $task->delete();
 
         // Download the file and auto-delete it after sending
         return response()->download($filePath, $optimizedFileName)->deleteFileAfterSend();
+    }
+
+    /**
+     * Download the WebP version of the optimized file
+     */
+    public function downloadWebp(string $taskId)
+    {
+        $task = OptimizationTask::where('task_id', $taskId)
+            ->where('status', 'completed')
+            ->where('webp_generated', true)
+            ->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found, not completed, or WebP not generated',
+            ], 404);
+        }
+
+        if ($task->isExpired()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task has expired',
+            ], 410);
+        }
+
+        if (!Storage::disk('public')->exists($task->webp_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'WebP file not found',
+            ], 404);
+        }
+
+        // Get file path and name for download
+        $filePath = Storage::disk('public')->path($task->webp_path);
+        $webpFileName = $task->getWebpFilename();
+
+        // Log the download
+        $this->logger->logTaskDownloaded($task, 'webp');
+
+        // Download the WebP file and auto-delete it after sending
+        return response()->download($filePath, $webpFileName)->deleteFileAfterSend();
     }
 
     /**
@@ -185,6 +242,9 @@ class OptimizeController extends Controller
         Storage::disk('public')->delete($task->original_path);
         if ($task->optimized_path) {
             Storage::disk('public')->delete($task->optimized_path);
+        }
+        if ($task->webp_path) {
+            Storage::disk('public')->delete($task->webp_path);
         }
 
         // Delete task record

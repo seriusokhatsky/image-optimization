@@ -36,11 +36,15 @@ Content-Type: multipart/form-data
 | `quality` | Integer | No | Quality setting 1-100 (default: 80) |
 
 **Supported File Types:**
-- JPEG/JPG (optimized with MozJPEG)
-- PNG (optimized with Pngquant + Optipng)
-- WebP (optimized with Cwebp)
+- JPEG/JPG (optimized with MozJPEG, WebP copy generated)
+- PNG (optimized with Pngquant + Optipng, WebP copy generated)
+- WebP (optimized with Cwebp, WebP copy generated)
 - GIF (optimized with Gifsicle)
 - SVG (optimized with SVGO)
+- TIFF (WebP copy generated)
+
+**WebP Generation:**
+For supported image formats (JPEG, PNG, TIFF, WebP), an additional WebP version is automatically generated for better compression and modern browser support.
 
 #### Response
 
@@ -147,9 +151,16 @@ curl -X POST http://your-domain.com/api/optimize/submit \
       "processing_time": "234.56 ms",
       "optimized_size": 762880
     },
+    "webp": {
+      "compression_ratio": 35.2,
+      "size_reduction": 360448,
+      "processing_time": "156.78 ms",
+      "webp_size": 663552
+    },
     "created_at": "2024-01-01T12:00:00.000000Z",
     "completed_at": "2024-01-01T12:01:15.000000Z",
-    "download_url": "http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716-446655440000"
+    "download_url": "http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716-446655440000",
+    "webp_download_url": "http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716-446655440000/webp"
   }
 }
 ```
@@ -248,6 +259,59 @@ curl -X GET http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716
 
 ---
 
+### 4. Download WebP Version
+
+**Endpoint:** `GET /optimize/download/{taskId}/webp`
+
+**Description:** Download the WebP version of the optimized file. Available only for supported image formats (JPEG, PNG, TIFF, WebP). File is automatically deleted after download.
+
+#### Request
+
+**Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `taskId` | String | Yes | UUID of the completed optimization task with WebP generated |
+
+#### Response
+
+**Success (200 OK):**
+- Returns the WebP file as a download
+- Filename format: `{original_filename}.webp`
+- Content-Disposition header sets the download filename
+- File is automatically deleted after download
+
+**Task Not Found (404 Not Found):**
+```json
+{
+  "success": false,
+  "message": "Task not found, not completed, or WebP not generated"
+}
+```
+
+**Task Expired (410 Gone):**
+```json
+{
+  "success": false,
+  "message": "Task has expired"
+}
+```
+
+**WebP File Not Found (404 Not Found):**
+```json
+{
+  "success": false,
+  "message": "WebP file not found"
+}
+```
+
+#### cURL Example
+```bash
+curl -X GET http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716-446655440000/webp \
+  -o "optimized_file.jpg.webp"
+```
+
+---
+
 ## Workflow Examples
 
 ### Basic Optimization Workflow
@@ -267,8 +331,13 @@ curl -X GET http://your-domain.com/api/optimize/status/550e8400-e29b-41d4-a716-4
 
 3. **Download when completed:**
 ```bash
+# Download optimized original format
 curl -X GET http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716-446655440000 \
   -o "my_photo-optimized.jpg"
+
+# Download WebP version (if available)
+curl -X GET http://your-domain.com/api/optimize/download/550e8400-e29b-41d4-a716-446655440000/webp \
+  -o "my_photo.jpg.webp"
 ```
 
 ### JavaScript Example
@@ -302,10 +371,20 @@ async function optimizeFile(file, quality = 80) {
     }
   }
   
-  // Step 3: Download optimized file
+  // Step 3: Download optimized files
   if (status === 'completed') {
+    // Download original format
     const downloadUrl = `/api/optimize/download/${taskId}`;
     window.open(downloadUrl, '_blank');
+    
+    // Download WebP version if available
+    const statusResult = await fetch(`/api/optimize/status/${taskId}`);
+    const statusData = await statusResult.json();
+    if (statusData.data.webp_download_url) {
+      setTimeout(() => {
+        window.open(statusData.data.webp_download_url, '_blank');
+      }, 1000); // Small delay to avoid popup blocking
+    }
   }
 }
 
@@ -352,7 +431,8 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
 ## Rate Limits
 
 - File size limit: 10MB
-- Supported formats: JPEG, PNG, WebP, GIF, SVG
+- Supported formats: JPEG, PNG, WebP, GIF, SVG, TIFF
+- WebP generation: Automatic for JPEG, PNG, TIFF, WebP
 - Task expiration: 24 hours
 - No rate limits currently implemented
 
@@ -385,8 +465,14 @@ Common error scenarios:
 ## File Naming Convention
 
 **Downloaded files use the format:**
+
+**Optimized Original Format:**
 - Original: `my_photo.jpg` → Download: `my_photo-optimized.jpg`
 - Original: `image-100x50.png` → Download: `image-100x50-optimized.png`
+
+**WebP Version:**
+- Original: `my_photo.jpg` → WebP Download: `my_photo.jpg.webp`
+- Original: `image-100x50.png` → WebP Download: `image-100x50.png.webp`
 
 **Internal storage uses UUID naming for uniqueness.**
 
