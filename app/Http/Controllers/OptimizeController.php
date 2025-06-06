@@ -118,6 +118,12 @@ class OptimizeController extends Controller
                 'processing_time' => $task->processing_time . ' ms',
                 'optimized_size' => $task->optimized_size,
             ];
+
+            // Add size increase warning if optimization didn't reduce size
+            if ($task->size_reduction <= 0) {
+                $response['data']['optimization']['size_increase_prevented'] = true;
+                $response['data']['optimization']['note'] = 'Original file was already well-optimized';
+            }
             
             // Include WebP information if generated
             if ($task->webp_generated) {
@@ -127,6 +133,13 @@ class OptimizeController extends Controller
                     'processing_time' => $task->webp_processing_time,
                     'webp_size' => $task->webp_size,
                 ];
+
+                // Add warning for WebP if it didn't provide benefits
+                if ($task->webp_size_reduction <= 0) {
+                    $response['data']['webp']['size_increase_warning'] = true;
+                    $response['data']['webp']['note'] = 'WebP conversion did not reduce file size for this image';
+                }
+
                 $response['data']['webp_download_url'] = route('optimize.download.webp', $task->task_id);
             }
             

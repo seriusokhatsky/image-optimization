@@ -85,6 +85,25 @@ class WebpConverterService
             // Get WebP file size
             $webpSize = filesize($tempWebpPath);
 
+            // Check if WebP conversion actually reduced file size
+            if ($webpSize >= $originalSize) {
+                // WebP is larger or same size - still provide it but flag the issue
+                $endTime = microtime(true);
+                $processingTime = round(($endTime - $startTime) * 1000, 2);
+                
+                return [
+                    'success' => true,
+                    'original_size' => $originalSize,
+                    'webp_size' => $webpSize,
+                    'size_reduction' => $originalSize - $webpSize, // Will be negative
+                    'compression_ratio' => $this->calculateCompressionRatio($originalSize, $webpSize), // Will be negative
+                    'processing_time' => $processingTime . ' ms',
+                    'webp_path' => $outputPath,
+                    'size_increase_warning' => true,
+                    'reason' => 'WebP conversion increased file size - may not be beneficial for this image'
+                ];
+            }
+
             $endTime = microtime(true);
             $processingTime = round(($endTime - $startTime) * 1000, 2);
 

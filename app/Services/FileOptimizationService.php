@@ -107,6 +107,28 @@ class FileOptimizationService
             // Get optimized file size
             $optimizedSize = filesize($optimizedPath);
             
+            // Check if optimization actually reduced file size
+            if ($optimizedSize >= $originalSize) {
+                // Optimization made file larger or same size - revert to original
+                copy($originalFilePath, $optimizedPath);
+                $optimizedSize = $originalSize;
+                
+                $endTime = microtime(true);
+                $processingTime = round(($endTime - $startTime) * 1000, 2);
+                
+                return [
+                    'algorithm' => $this->getAlgorithmForMimeType($mimeType, $quality) . ' (reverted - no size reduction)',
+                    'processing_time' => $processingTime . ' ms',
+                    'optimized' => true,
+                    'original_size' => $originalSize,
+                    'optimized_size' => $optimizedSize,
+                    'size_reduction' => 0,
+                    'compression_ratio' => 0.0,
+                    'size_increase_prevented' => true,
+                    'reason' => 'Optimization increased file size, reverted to original'
+                ];
+            }
+            
             $endTime = microtime(true);
             $processingTime = round(($endTime - $startTime) * 1000, 2);
 
@@ -311,5 +333,64 @@ class FileOptimizationService
     public function supportsWebpConversion(string $mimeType): bool
     {
         return $this->webpConverter->canConvertToWebp($mimeType);
+    }
+
+    /**
+     * Analyze image to predict optimization potential.
+     *
+     * @param string $filePath Path to the image file
+     * @param int $fileSize File size in bytes
+     * @return array Analysis result with optimization recommendations
+     */
+    public function analyzeOptimizationPotential(string $filePath, int $fileSize): array
+    {
+        $analysis = [
+            'likely_to_benefit' => true,
+            'confidence' => 'medium',
+            'recommendations' => [],
+            'warnings' => []
+        ];
+
+        // Very small files (< 5KB) often don't benefit from optimization
+        if ($fileSize < 5120) {
+            $analysis['likely_to_benefit'] = false;
+            $analysis['confidence'] = 'high';
+            $analysis['warnings'][] = 'File is very small (' . round($fileSize / 1024, 1) . 'KB) - optimization may increase size';
+            return $analysis;
+        }
+
+        // Files smaller than 50KB have lower optimization potential
+        if ($fileSize < 51200) {
+            $analysis['confidence'] = 'low';
+            $analysis['warnings'][] = 'Small file size may limit optimization benefits';
+        }
+
+        // Try to get image dimensions and quality hints if possible
+        try {
+            $imageInfo = getimagesize($filePath);
+            if ($imageInfo !== false) {
+                $width = $imageInfo[0];
+                $height = $imageInfo[1];
+                $pixels = $width * $height;
+                $bytesPerPixel = $fileSize / $pixels;
+
+                // Very high bytes per pixel suggests already heavy compression
+                if ($bytesPerPixel < 0.5) {
+                    $analysis['confidence'] = 'low';
+                    $analysis['warnings'][] = 'Image appears heavily compressed already';
+                }
+
+                // Very low bytes per pixel suggests good optimization potential
+                if ($bytesPerPixel > 3) {
+                    $analysis['confidence'] = 'high';
+                    $analysis['recommendations'][] = 'Image has high optimization potential';
+                }
+            }
+        } catch (\Exception $e) {
+            // Image analysis failed, proceed with default analysis
+            $analysis['warnings'][] = 'Could not analyze image properties';
+        }
+
+        return $analysis;
     }
 } 
