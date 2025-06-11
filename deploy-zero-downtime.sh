@@ -120,6 +120,14 @@ ENVEOF
         echo "🟢 Bringing application online..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan up
         
+        echo "🔍 Verifying application is live..."
+        if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
+            echo "✅ Application is responding properly"
+        else
+            echo "❌ Application may still be in maintenance mode"
+            docker compose -f docker-compose.prod.yml exec -T app php artisan up
+        fi
+        
         echo "✅ Zero-downtime deployment completed!"
         echo "📊 Final container status:"
         docker compose -f docker-compose.prod.yml ps
