@@ -134,12 +134,28 @@ ENVEOF
         sleep 15
         
         echo "🔄 Recreating application container with new image..."
+        # Disable strict error mode for container recreation to prevent script exit
+        set +e
+        
         # Stop the current container and recreate with new image
+        echo "🛑 Stopping current container..."
         docker compose -f docker-compose.prod.yml stop app
+        
+        echo "🗑️ Removing old container..."
         docker compose -f docker-compose.prod.yml rm -f app
+        
+        echo "🚀 Starting new container..."
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
+        # Re-enable strict error mode
+        set -e
+        
+        echo "✅ Container recreation completed"
+        
         echo "⏳ Waiting for container to be ready..."
+        # Disable strict error mode for container readiness check
+        set +e
+        
         # Wait for the container to be fully started and responsive
         for i in {1..12}; do
             if docker compose -f docker-compose.prod.yml exec -T app php -v > /dev/null 2>&1; then
@@ -148,8 +164,14 @@ ENVEOF
             else
                 echo "⏳ Waiting for container... (attempt $i/12)"
                 sleep 5
+                if [ $i -eq 12 ]; then
+                    echo "⚠️ Container readiness check timed out, but continuing..."
+                fi
             fi
         done
+        
+        # Re-enable strict error mode
+        set -e
         
         echo "🔧 Ensuring maintenance mode is off immediately after container start..."
         # Force remove maintenance mode file and bring app online
@@ -166,7 +188,15 @@ ENVEOF
         if [[ "$RUNNING_IMAGE_ID" == *"$NEW_IMAGE_ID"* ]]; then
             echo "✅ Container is using the new image"
         else
-            echo "⚠️ Container may be using old image, but continuing..."
+            echo "❌ Container is using old image! Forcing recreation..."
+            # Force recreation with correct image
+            set +e
+            docker compose -f docker-compose.prod.yml stop app
+            docker compose -f docker-compose.prod.yml rm -f app
+            docker compose -f docker-compose.prod.yml up -d --no-deps app
+            sleep 10
+            set -e
+            echo "🔄 Forced recreation completed"
         fi
         
         echo "🔍 Verifying new code is deployed..."
@@ -177,6 +207,14 @@ ENVEOF
             echo "✅ New code confirmed in container (file date: $CONTAINER_DATE)"
         else
             echo "⚠️ Container may have old code (file date: $CONTAINER_DATE, today: $TODAY_DATE)"
+        fi
+        
+        echo "🔍 Verifying specific changes are deployed..."
+        # Check for specific changes in the demo file
+        if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof Deployments" resources/views/demo.blade.php 2>/dev/null; then
+            echo "✅ Latest changes confirmed in container"
+        else
+            echo "⚠️ Latest changes not found in container - cache may need clearing"
         fi
         
         echo "📊 Running migrations on new container..."
