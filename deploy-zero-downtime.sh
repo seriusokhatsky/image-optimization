@@ -207,8 +207,8 @@ ENVEOF
         
         echo "🔍 Verifying specific changes are deployed..."
         # Check for specific changes in the demo file
-        if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof12 Deployments" resources/views/demo.blade.php 2>/dev/null; then
-            echo "✅ Latest changes confirmed in container (Bulletproof12 found)"
+        if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof13 Deployments" resources/views/demo.blade.php 2>/dev/null; then
+            echo "✅ Latest changes confirmed in container (Bulletproof13 found)"
         else
             echo "⚠️ Latest changes not found in container - checking what's there..."
             docker compose -f docker-compose.prod.yml exec -T app grep -o "Lightning Fast HOO.*Deployments" resources/views/demo.blade.php || echo "Text not found"
