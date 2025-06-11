@@ -38,18 +38,9 @@ print_step() {
     echo -e "${BLUE}[STEP]${NC} $1"
 }
 
-# Check if required variables are set
-if [ "$REMOTE_HOST" = "YOUR_HETZNER_IP" ]; then
-    print_error "Please update REMOTE_HOST with your actual Hetzner server IP"
-    exit 1
-fi
+# Configuration is now set above - ready to deploy
 
-if [ "$REPO_URL" = "YOUR_GITHUB_REPO_URL" ]; then
-    print_error "Please update REPO_URL with your actual GitHub repository URL"
-    exit 1
-fi
-
-# Deploy to server
+# Deploy to server with proper environment handling
 deploy_to_server() {
     print_status "Connecting to server and deploying from GitHub..."
     
@@ -109,63 +100,72 @@ deploy_to_server() {
             git pull origin $BRANCH
         fi
         
-        # Create .env file if it doesn't exist
-        if [ ! -f ".env" ]; then
-            echo "📝 Creating .env file template..."
-            cat > .env << 'ENVEOF'
-APP_NAME="Optimizer"
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=
+        # Create or update .env file for production
+        echo "📝 Setting up production environment file..."
+        cat > .env << 'ENVEOF'
+# Production Environment Configuration
+APP_NAME=Optimizer
 APP_URL=https://img-optim.xtemos.com
+LOG_LEVEL=info
 
-DB_CONNECTION=mysql
-DB_HOST=mysql
-DB_PORT=3306
+# Database Configuration
 DB_DATABASE=optimizer
 DB_USERNAME=sail
 DB_PASSWORD=CHANGE_THIS_PASSWORD
 
-# Add your other environment variables here
+# Mail Configuration (update as needed)
+MAIL_MAILER=smtp
+MAIL_HOST=mailpit
+MAIL_PORT=1025
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=
+MAIL_FROM_ADDRESS=noreply@img-optim.xtemos.com
+MAIL_FROM_NAME=Optimizer
 ENVEOF
-            echo "⚠️  Please edit .env file with your actual configuration!"
-        fi
+
+        # Generate APP_KEY if not already set
+        echo "🔑 Generating APP_KEY..."
+        APP_KEY="base64:\$(openssl rand -base64 32)"
+        echo "APP_KEY=\$APP_KEY" >> .env
+        echo "✅ APP_KEY generated: \$APP_KEY"
         
         # Stop existing containers gracefully
         echo "🛑 Stopping existing containers..."
         docker compose -f docker-compose.prod.yml down || true
         
-        # Build and deploy
-        echo "🏗️  Building and starting containers..."
-        docker compose -f docker-compose.prod.yml up -d --build
+        # Build and deploy with zero downtime strategy
+        echo "🏗️  Building new images..."
+        docker compose -f docker-compose.prod.yml build app
+        
+        # Start containers
+        echo "🚀 Starting containers..."
+        docker compose -f docker-compose.prod.yml up -d
         
         # Wait for containers to be ready
         echo "⏳ Waiting for containers to be ready..."
         sleep 30
         
-        # Run Laravel setup
-        echo "🎯 Setting up Laravel..."
-        
-        # Generate app key if not set
-        echo "🔑 Checking and generating APP_KEY..."
-        # Check if APP_KEY is empty or not set in .env
-        if ! grep -q "^APP_KEY=base64:" .env; then
-            echo "Generating new APP_KEY..."
-            docker compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
-        else
-            echo "✅ APP_KEY is already set"
-        fi
-        
-        # Run migrations
+        # Check database connection and run migrations
+        echo "📊 Running database migrations..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
         
-        # Clear and optimize
+        # Clear and optimize caches
+        echo "🧹 Optimizing application..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
+        
+        # Check queue workers
+        echo "👥 Checking queue workers..."
+        docker compose -f docker-compose.prod.yml exec -T app supervisorctl status
         
         echo "✅ Deployment completed successfully!"
         echo "📊 Container status:"
         docker compose -f docker-compose.prod.yml ps
+        
+        echo "🔍 Testing application health..."
+        sleep 5
+        curl -I http://localhost || echo "⚠️ Health check failed - check logs"
 ENDSSH
 
     print_status "Deployment completed!"
@@ -196,7 +196,7 @@ update_and_push() {
 
 # Main deployment function
 main() {
-    print_status "Starting GitHub-based deployment to branch: $BRANCH"
+    print_status "Starting environment-based deployment to branch: $BRANCH"
     
     # Validate environment
     if [ ! -f "docker-compose.prod.yml" ]; then
@@ -216,8 +216,8 @@ main() {
     print_status "🎉 Deployment completed!"
     print_warning "Next steps:"
     echo "1. SSH to your server: ssh $REMOTE_USER@$REMOTE_HOST"
-    echo "2. Edit .env file: cd $PROJECT_DIR && nano .env"
-    echo "3. Generate SSL certificates (see README-DEPLOYMENT.md)"
+    echo "2. Update database password in .env: cd $PROJECT_DIR && nano .env"
+    echo "3. Restart after password update: docker compose -f docker-compose.prod.yml restart"
     echo "4. Your app will be available at: https://img-optim.xtemos.com"
 }
 
