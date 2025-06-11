@@ -12,9 +12,9 @@ NC='\033[0m'
 
 # Configuration
 REMOTE_USER="root"
-REMOTE_HOST="YOUR_HETZNER_IP"
+REMOTE_HOST="157.180.83.204"
 PROJECT_DIR="/var/www/optimizer"
-REPO_URL="YOUR_GITHUB_REPO_URL"
+REPO_URL="https://github.com/xtemos/images-optimizer.git"
 BRANCH="${1:-main}"
 
 print_status() {
