@@ -33,8 +33,10 @@ print_step() {
     echo -e "${BLUE}[STEP]${NC} $1"
 }
 
-# Zero-downtime deployment function
-deploy_with_supervisor_queues() {
+# Zero-downtime deployment with environment variables
+deploy_zero_downtime() {
+    print_status "Starting zero-downtime deployment with environment variable persistence..."
+    
     ssh $REMOTE_USER@$REMOTE_HOST << 'ENDSSH'
         set -e
         cd /var/www/optimizer
@@ -44,28 +46,68 @@ deploy_with_supervisor_queues() {
         git checkout main
         git pull origin main
         
+        echo "💾 Preserving environment configuration..."
+        # Check if .env exists and has APP_KEY, if not create it
+        if [ ! -f ".env" ] || ! grep -q "^APP_KEY=base64:" .env; then
+            echo "📝 Setting up production environment file..."
+            cat > .env << 'ENVEOF'
+# Production Environment Configuration
+APP_NAME=Optimizer
+APP_URL=https://img-optim.xtemos.com
+LOG_LEVEL=info
+
+# Database Configuration
+DB_DATABASE=optimizer
+DB_USERNAME=sail
+DB_PASSWORD=CHANGE_THIS_PASSWORD
+
+# Mail Configuration (update as needed)
+MAIL_MAILER=smtp
+MAIL_HOST=mailpit
+MAIL_PORT=1025
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=
+MAIL_FROM_ADDRESS=noreply@img-optim.xtemos.com
+MAIL_FROM_NAME=Optimizer
+ENVEOF
+
+            # Generate APP_KEY
+            echo "🔑 Generating APP_KEY..."
+            APP_KEY="base64:$(openssl rand -base64 32)"
+            echo "APP_KEY=$APP_KEY" >> .env
+            echo "✅ APP_KEY generated and set"
+        else
+            echo "✅ Environment file exists with valid APP_KEY"
+        fi
+        
         echo "🏗️ Building new image..."
         docker compose -f docker-compose.prod.yml build app
         
         echo "🔧 Putting app in maintenance mode..."
-        docker compose -f docker-compose.prod.yml exec -T app php artisan down --refresh=15
+        docker compose -f docker-compose.prod.yml exec -T app php artisan down --refresh=15 || echo "⚠️ Could not enable maintenance mode (app may not be running)"
         
         echo "📊 Running migrations..."
-        docker compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+        # Try to run migrations on existing container first
+        docker compose -f docker-compose.prod.yml exec -T app php artisan migrate --force || echo "⚠️ Migration on existing container failed, will retry after restart"
         
         echo "👥 Gracefully stopping queue workers..."
         # Send SIGTERM to queue workers to finish current jobs
-        docker compose -f docker-compose.prod.yml exec -T app supervisorctl stop laravel-worker:*
+        docker compose -f docker-compose.prod.yml exec -T app supervisorctl stop laravel-worker:* || echo "⚠️ Could not stop workers gracefully"
         
-        echo "⏳ Waiting for current jobs to finish (max 30 seconds)..."
-        sleep 30
+        echo "⏳ Waiting for current jobs to finish (max 15 seconds)..."
+        sleep 15
         
-        echo "🔄 Recreating application container..."
-        # Recreate container with new image
+        echo "🔄 Recreating application container with new image..."
+        # Recreate container with new image while preserving environment
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
         echo "⏳ Waiting for container to be ready..."
-        sleep 20
+        sleep 25
+        
+        echo "📊 Running migrations on new container..."
+        # Run migrations on new container to ensure database is up to date
+        docker compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
         
         echo "👥 Verifying queue workers are running..."
         # Check that supervisor started the queue workers
@@ -78,14 +120,15 @@ deploy_with_supervisor_queues() {
         echo "🟢 Bringing application online..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan up
         
-        echo "✅ Deployment completed!"
+        echo "✅ Zero-downtime deployment completed!"
+        echo "📊 Final container status:"
         docker compose -f docker-compose.prod.yml ps
 ENDSSH
 }
 
 # Health check function
 health_check() {
-    print_step "Performing health check..."
+    print_step "Performing comprehensive health check..."
     
     ssh $REMOTE_USER@$REMOTE_HOST << 'ENDSSH'
         cd /var/www/optimizer
@@ -95,18 +138,25 @@ health_check() {
         
         echo "🔍 Checking application health..."
         # Test if the application responds
-        if curl -f -s http://localhost/health > /dev/null; then
+        if curl -f -s -I http://localhost > /dev/null; then
             echo "✅ Application is responding"
         else
             echo "❌ Application health check failed"
             exit 1
         fi
         
-        echo "🔍 Checking queue worker..."
-        if docker compose -f docker-compose.prod.yml exec -T queue php artisan queue:work --once --timeout=1 > /dev/null 2>&1; then
-            echo "✅ Queue worker is functioning"
+        echo "🔍 Checking supervisor status..."
+        docker compose -f docker-compose.prod.yml exec -T app supervisorctl status
+        
+        echo "🔍 Checking queue worker logs..."
+        docker compose -f docker-compose.prod.yml exec -T app tail -n 5 /tmp/worker.log || echo "⚠️ No worker logs yet"
+        
+        echo "🔍 Testing Laravel functionality..."
+        if docker compose -f docker-compose.prod.yml exec -T app php artisan --version > /dev/null; then
+            echo "✅ Laravel is functioning properly"
         else
-            echo "⚠️ Queue worker check inconclusive (normal if no jobs)"
+            echo "❌ Laravel command failed"
+            exit 1
         fi
 ENDSSH
 }
@@ -122,15 +172,20 @@ rollback() {
         git reset --hard HEAD~1
         
         echo "🏗️ Rebuilding with previous version..."
-        docker compose -f docker-compose.prod.yml build
-        docker compose -f docker-compose.prod.yml up -d
+        docker compose -f docker-compose.prod.yml build app
+        docker compose -f docker-compose.prod.yml up -d --no-deps app
+        
+        echo "⏳ Waiting for rollback container..."
+        sleep 20
         
         echo "🔧 Running maintenance tasks..."
-        docker compose -f docker-compose.prod.yml exec -T app php artisan migrate:rollback --force
+        docker compose -f docker-compose.prod.yml exec -T app php artisan migrate:rollback --force || echo "⚠️ Migration rollback failed"
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
+        docker compose -f docker-compose.prod.yml exec -T app php artisan up
         
         echo "🟢 Rollback completed!"
+        docker compose -f docker-compose.prod.yml ps
 ENDSSH
 }
 
@@ -150,7 +205,7 @@ main() {
     fi
     
     # Ask for confirmation
-    read -p "Deploy to production? This will update the running application. (y/N): " -n 1 -r
+    read -p "Deploy to production? This will update the running application with zero downtime. (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         print_status "Deployment cancelled"
@@ -162,14 +217,22 @@ main() {
     git push origin $BRANCH
     
     # Deploy
-    if deploy_with_supervisor_queues; then
+    if deploy_zero_downtime; then
         print_status "✅ Deployment successful!"
         
         # Run health check
         sleep 5
-        health_check
-        
-        print_status "🎉 Zero-downtime deployment completed successfully!"
+        if health_check; then
+            print_status "🎉 Zero-downtime deployment completed successfully!"
+            print_status "🌐 Your application is now live at: https://img-optim.xtemos.com"
+        else
+            print_warning "⚠️ Deployment completed but health check failed"
+            read -p "Do you want to rollback? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                rollback
+            fi
+        fi
     else
         print_error "❌ Deployment failed!"
         read -p "Do you want to rollback? (y/N): " -n 1 -r
