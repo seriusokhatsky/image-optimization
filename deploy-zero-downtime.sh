@@ -119,7 +119,9 @@ ENVEOF
         sleep 15
         
         echo "🔄 Recreating application container with new image..."
-        # Recreate container with new image while preserving environment
+        # Stop the current container and recreate with new image
+        docker compose -f docker-compose.prod.yml stop app
+        docker compose -f docker-compose.prod.yml rm -f app
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
         echo "⏳ Waiting for container to be ready..."
