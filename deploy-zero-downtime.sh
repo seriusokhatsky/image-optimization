@@ -141,37 +141,56 @@ ENVEOF
         NEW_IMAGE_HASH=$(docker images optimizer-app:production --format "{{.ID}}")
         echo "📋 New image to deploy: $NEW_IMAGE_HASH"
         
-        # Stop the current container and recreate with new image
-        echo "🛑 Stopping current container..."
-        docker compose -f docker-compose.prod.yml stop app
+        # Perform aggressive container recreation with verification
+        echo "🔄 Performing container recreation with retry logic..."
+        RECREATION_SUCCESS=false
         
-        echo "🗑️ Removing old container..."
-        docker compose -f docker-compose.prod.yml rm -f app
-        
-        echo "🚀 Starting new container..."
-        docker compose -f docker-compose.prod.yml up -d --no-deps app
-        
-        # Verify the container is actually using the new image
-        echo "🔍 Verifying container is using new image..."
-        sleep 5
-        for i in {1..5}; do
-            RUNNING_IMAGE=$(docker compose -f docker-compose.prod.yml ps app --format "{{.Image}}")
+        for recreation_attempt in {1..3}; do
+            echo "🔄 Recreation attempt $recreation_attempt/3..."
+            
+            # Stop and remove old container
+            echo "🛑 Stopping current container..."
+            docker compose -f docker-compose.prod.yml stop app || true
+            
+            echo "🗑️ Removing old container..."
+            docker compose -f docker-compose.prod.yml rm -f app || true
+            
+            echo "🚀 Starting new container..."
+            docker compose -f docker-compose.prod.yml up -d --no-deps app
+            
+            # Wait for container to start
+            sleep 8
+            
+            # Verify the container is using the new image
+            echo "🔍 Verifying container is using new image..."
+            RUNNING_IMAGE=$(docker compose -f docker-compose.prod.yml ps app --format "{{.Image}}" 2>/dev/null || echo "none")
+            
             if [[ "$RUNNING_IMAGE" == *"$NEW_IMAGE_HASH"* ]]; then
-                echo "✅ Container is using new image (attempt $i)"
+                echo "✅ Container is using new image (hash: $NEW_IMAGE_HASH)"
+                RECREATION_SUCCESS=true
                 break
             else
-                echo "❌ Container using wrong image ($RUNNING_IMAGE), recreating... (attempt $i/5)"
-                docker compose -f docker-compose.prod.yml stop app
-                docker compose -f docker-compose.prod.yml rm -f app
-                docker compose -f docker-compose.prod.yml up -d --no-deps app
-                sleep 5
+                echo "❌ Container still using wrong image: $RUNNING_IMAGE (expected: $NEW_IMAGE_HASH)"
+                if [ $recreation_attempt -eq 3 ]; then
+                    echo "❌ Container recreation failed after 3 attempts!"
+                    echo "🔍 Current running images:"
+                    docker compose -f docker-compose.prod.yml ps || true
+                else
+                    echo "🔄 Retrying container recreation..."
+                    sleep 5
+                fi
             fi
         done
         
-        # Re-enable strict error mode
+        # Re-enable strict error mode  
         set -e
         
-        echo "✅ Container recreation completed"
+        # Verify recreation was successful
+        if [ "$RECREATION_SUCCESS" = true ]; then
+            echo "✅ Container recreation completed successfully"
+        else
+            echo "⚠️ Container recreation had issues but continuing..."
+        fi
         
         echo "⏳ Waiting for container to be ready..."
         # Wait for the container to be fully started and responsive
@@ -206,13 +225,41 @@ ENVEOF
         fi
         
         echo "🔍 Verifying specific changes are deployed..."
-        # Check for specific changes in the demo file
-        if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof13 Deployments" resources/views/demo.blade.php 2>/dev/null; then
-            echo "✅ Latest changes confirmed in container (Bulletproof13 found)"
-        else
-            echo "⚠️ Latest changes not found in container - checking what's there..."
-            docker compose -f docker-compose.prod.yml exec -T app grep -o "Lightning Fast HOO.*Deployments" resources/views/demo.blade.php || echo "Text not found"
-        fi
+        # Check for specific changes in the demo file with retry logic
+        VERIFICATION_SUCCESS=false
+        for verify_attempt in {1..3}; do
+            echo "🔍 Verification attempt $verify_attempt/3..."
+            
+            if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof13 Deployments" resources/views/demo.blade.php 2>/dev/null; then
+                echo "✅ Latest changes confirmed in container (Bulletproof13 found)"
+                VERIFICATION_SUCCESS=true
+                break
+            else
+                echo "⚠️ Latest changes not found - checking what's there..."
+                CURRENT_TEXT=$(docker compose -f docker-compose.prod.yml exec -T app grep -o "Lightning Fast HOO.*Deployments" resources/views/demo.blade.php 2>/dev/null || echo "Text not found")
+                echo "📋 Current text: $CURRENT_TEXT"
+                
+                if [ $verify_attempt -eq 3 ]; then
+                    echo "❌ Latest changes not found after 3 attempts!"
+                    echo "🔧 Forcing final container recreation..."
+                    # One last attempt to force the new container
+                    docker compose -f docker-compose.prod.yml stop app || true
+                    docker compose -f docker-compose.prod.yml rm -f app || true
+                    docker compose -f docker-compose.prod.yml up -d --no-deps app
+                    sleep 10
+                    # Final check
+                    if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof13 Deployments" resources/views/demo.blade.php 2>/dev/null; then
+                        echo "✅ Latest changes found after forced recreation!"
+                        VERIFICATION_SUCCESS=true
+                    else
+                        echo "❌ Still no latest changes - manual intervention may be needed"
+                    fi
+                else
+                    echo "🔄 Retrying verification..."
+                    sleep 3
+                fi
+            fi
+        done
         
         echo "📊 Running migrations on new container..."
         # Run migrations on new container to ensure database is up to date
