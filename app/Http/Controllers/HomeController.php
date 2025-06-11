@@ -44,7 +44,7 @@ class HomeController extends Controller
     public function upload(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:jpg,jpeg,png,gif,webp,svg|max:10240', // 10MB max
+            'file' => 'required|file|mimes:jpg,jpeg,png,gif,webp|max:10240', // 10MB max
             'quality' => 'nullable|integer|min:1|max:100',
         ]);
 

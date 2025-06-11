@@ -8,7 +8,7 @@ A simple web interface for the image optimization API, similar to imagecompresso
 - **Quality Control**: Adjustable quality slider (1-100%)
 - **Rate Limiting**: Maximum 10 uploads per IP address per hour
 - **Real-time Progress**: Live status updates during optimization
-- **Multiple Formats**: Support for JPEG, PNG, GIF, WebP, and SVG
+- **Multiple Formats**: Support for JPEG, PNG, GIF, and WebP
 - **WebP Generation**: Automatic WebP variants when beneficial
 - **Download Links**: Direct download of optimized images
 - **File Cleanup**: Automatic cleanup after 1 hour
@@ -19,7 +19,6 @@ A simple web interface for the image optimization API, similar to imagecompresso
 - **PNG** (.png) - Pngquant + Optipng optimization
 - **GIF** (.gif) - Gifsicle optimization
 - **WebP** (.webp) - Cwebp optimization
-- **SVG** (.svg) - SVGO optimization
 
 ## Setup Instructions
 
@@ -132,7 +131,7 @@ Edit `app/Http/Controllers/HomeController.php`:
 
 ```php
 // Change max file size (in KB)
-'file' => 'required|file|mimes:jpg,jpeg,png,gif,webp,svg|max:10240'
+'file' => 'required|file|mimes:jpg,jpeg,png,gif,webp|max:10240'
 ```
 
 ## Security Features

@@ -40,7 +40,7 @@
                 Image Optimizer
             </h1>
             <p class="text-lg text-gray-600 mb-2">
-                Compress JPEG, PNG, GIF, WebP and SVG images with optimal quality
+                Compress JPEG, PNG, GIF and WebP images with optimal quality
             </p>
             <p class="text-sm text-gray-500">
                 <i class="fas fa-shield-alt text-green-500"></i>
@@ -70,11 +70,11 @@
                 </div>
 
                 <div class="flex items-center justify-center space-x-4 text-sm text-gray-500">
-                    <span><i class="fas fa-file-image text-blue-500"></i> JPEG, PNG, GIF, WebP, SVG</span>
+                    <span><i class="fas fa-file-image text-blue-500"></i> JPEG, PNG, GIF, WebP</span>
                     <span><i class="fas fa-weight text-green-500"></i> Max 10MB</span>
                 </div>
             </div>
-            <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.svg" class="hidden">
+            <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.gif,.webp" class="hidden">
         </div>
 
         <!-- Upload Queue -->
@@ -193,7 +193,7 @@
             
             // Filter valid image files
             const validFiles = files.filter(file => {
-                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
                 const maxSize = 10 * 1024 * 1024; // 10MB
                 
                 if (!validTypes.includes(file.type)) {
