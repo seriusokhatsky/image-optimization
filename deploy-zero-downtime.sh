@@ -122,16 +122,7 @@ ENVEOF
         echo "🔧 Putting app in maintenance mode..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan down --refresh=15 || echo "⚠️ Could not enable maintenance mode (app may not be running)"
         
-        echo "📋 Uploading deployment script to server..."
-        # Upload the server-side deployment script
-        scp deploy-server.sh $REMOTE_USER@$REMOTE_HOST:/var/www/optimizer/
-        
-        echo "🔧 Making script executable..."
-        ssh $REMOTE_USER@$REMOTE_HOST "chmod +x /var/www/optimizer/deploy-server.sh"
-        
-        echo "🚀 Running server-side deployment..."
-        # Execute the server-side deployment script
-        ssh $REMOTE_USER@$REMOTE_HOST "/var/www/optimizer/deploy-server.sh"
+
         
         echo "🔍 Verifying application is live..."
         # Give Laravel a moment to fully start
@@ -232,12 +223,15 @@ ENVEOF
         # Re-enable strict error mode
         set -e
         
-        echo "✅ All deployment steps completed successfully!"
-        echo "🌐 Check your application at: https://img-optim.xtemos.com"
-        
-        # Return success so the health check runs
-        exit 0
+        echo "✅ Build completed - ready for container deployment!"
 ENDSSH
+
+    # Execute server-side deployment outside of the main SSH session
+    print_step "Executing server-side deployment..."
+    scp deploy-server.sh $REMOTE_USER@$REMOTE_HOST:/var/www/optimizer/
+    ssh $REMOTE_USER@$REMOTE_HOST "chmod +x /var/www/optimizer/deploy-server.sh && /var/www/optimizer/deploy-server.sh"
+    
+    print_status "✅ Server-side deployment completed!"
 }
 
 # Health check function
