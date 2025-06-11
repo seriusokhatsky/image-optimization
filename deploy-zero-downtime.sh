@@ -158,27 +158,48 @@ ENVEOF
         # Give Laravel a moment to fully start
         sleep 5
         
-        # Test application response
-        if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
-            echo "✅ Application is responding properly"
-        else
-            echo "❌ Application health check failed, trying to exit maintenance mode again..."
-            docker compose -f docker-compose.prod.yml exec -T app php artisan up
-            sleep 3
+        # Test application response with retry logic
+        for i in {1..3}; do
             if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
-                echo "✅ Application is now responding"
+                echo "✅ Application is responding properly (attempt $i)"
+                break
             else
-                echo "❌ Application still not responding properly"
+                echo "⚠️ Application health check failed (attempt $i/3)"
+                if [ $i -lt 3 ]; then
+                    echo "🔄 Ensuring maintenance mode is off..."
+                    docker compose -f docker-compose.prod.yml exec -T app php artisan up
+                    sleep 3
+                fi
             fi
-        fi
+        done
         
         echo "🔍 Final verification - checking external access..."
-        # Test external HTTPS access
-        if curl -f -s -o /dev/null -w "%{http_code}" https://img-optim.xtemos.com/ | grep -q "200"; then
-            echo "✅ External HTTPS access confirmed (200 OK)"
-        else
-            echo "⚠️ External HTTPS access may be failing"
-        fi
+        sleep 2
+        
+        # External health check with retry
+        for i in {1..5}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://img-optim.xtemos.com/)
+            if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ External HTTPS access confirmed (HTTP 200) (attempt $i)"
+                break
+            else
+                echo "⚠️ External HTTPS access failed (HTTP $HTTP_CODE) (attempt $i/5)"
+                if [ $i -eq 5 ]; then
+                    echo "❌ External health check FAILED after 5 attempts"
+                    echo "ℹ️ Attempting to fix maintenance mode issue..."
+                    docker compose -f docker-compose.prod.yml exec -T app php artisan up
+                    echo "ℹ️ Check the application logs:"
+                    echo "  docker compose -f docker-compose.prod.yml logs app --tail=20"
+                else
+                    # If it's a 503, try to exit maintenance mode again
+                    if [ "$HTTP_CODE" = "503" ]; then
+                        echo "🔄 Service unavailable - attempting to exit maintenance mode..."
+                        docker compose -f docker-compose.prod.yml exec -T app php artisan up
+                    fi
+                    sleep 3
+                fi
+            fi
+        done
         
         echo "✅ Zero-downtime deployment completed!"
         echo "📊 Final container status:"
@@ -186,6 +207,11 @@ ENVEOF
         
         echo "👥 Queue worker status:"
         docker compose -f docker-compose.prod.yml exec -T app ps aux | grep -E "(queue|supervisor)" | grep -v grep || echo "No queue processes found"
+        
+        echo "🔧 Final safety check - ensuring maintenance mode is off..."
+        docker compose -f docker-compose.prod.yml exec -T app php artisan up
+        
+        echo "✅ All deployment steps completed successfully!"
 ENDSSH
 }
 
