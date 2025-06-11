@@ -42,9 +42,9 @@
             <p class="text-lg text-gray-600 mb-2">
                 Compress JPEG, PNG, GIF and WebP images with optimal quality
             </p>
-            <div class="inline-flex items-center bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium mb-2">
-                <i class="fas fa-rocket text-green-600 mr-2"></i>
-                Lightning Fast • Optimized Build System
+            <div class="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mb-2">
+                <i class="fas fa-rocket text-blue-600 mr-2"></i>
+                ⚡ Lightning Fast • Multi-Stage Cached Build ⚡
             </div>
             <p class="text-sm text-gray-500">
                 <i class="fas fa-shield-alt text-green-500"></i>
