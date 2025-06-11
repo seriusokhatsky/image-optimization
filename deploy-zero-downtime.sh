@@ -72,17 +72,25 @@ MAIL_FROM_ADDRESS=noreply@img-optim.xtemos.com
 MAIL_FROM_NAME=Optimizer
 ENVEOF
 
-            # Generate APP_KEY
+            # Generate APP_KEY with proper format
             echo "🔑 Generating APP_KEY..."
             APP_KEY="base64:$(openssl rand -base64 32)"
             echo "APP_KEY=$APP_KEY" >> .env
-            echo "✅ APP_KEY generated and set"
+            echo "✅ APP_KEY generated and set: $APP_KEY"
         else
             echo "✅ Environment file exists with valid APP_KEY"
+            # Verify APP_KEY is not placeholder
+            if grep -q "APP_KEY=base64:YOUR_GENERATED_KEY_HERE" .env; then
+                echo "🔑 Replacing placeholder APP_KEY with real one..."
+                APP_KEY="base64:$(openssl rand -base64 32)"
+                sed -i "s/APP_KEY=base64:YOUR_GENERATED_KEY_HERE/APP_KEY=$APP_KEY/" .env
+                echo "✅ APP_KEY updated: $APP_KEY"
+            fi
         fi
         
-        echo "🏗️ Building new image..."
-        docker compose -f docker-compose.prod.yml build app
+        echo "🏗️ Building new image with fresh cache..."
+        # Force rebuild without cache to ensure latest code is included
+        docker compose -f docker-compose.prod.yml build --no-cache app
         
         echo "🔧 Putting app in maintenance mode..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan down --refresh=15 || echo "⚠️ Could not enable maintenance mode (app may not be running)"
@@ -103,7 +111,17 @@ ENVEOF
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
         echo "⏳ Waiting for container to be ready..."
-        sleep 25
+        sleep 30
+        
+        echo "🔍 Verifying new code is deployed..."
+        # Check that the container has fresh timestamps (today's date)
+        CONTAINER_DATE=$(docker compose -f docker-compose.prod.yml exec -T app stat -c %y /var/www/html/DEMO_SETUP.md 2>/dev/null | cut -d' ' -f1 || echo "unknown")
+        TODAY_DATE=$(date +%Y-%m-%d)
+        if [ "$CONTAINER_DATE" = "$TODAY_DATE" ]; then
+            echo "✅ New code confirmed in container (file date: $CONTAINER_DATE)"
+        else
+            echo "⚠️ Container may have old code (file date: $CONTAINER_DATE, today: $TODAY_DATE)"
+        fi
         
         echo "📊 Running migrations on new container..."
         # Run migrations on new container to ensure database is up to date
@@ -111,26 +129,51 @@ ENVEOF
         
         echo "👥 Verifying queue workers are running..."
         # Check that supervisor started the queue workers
-        docker compose -f docker-compose.prod.yml exec -T app supervisorctl status
+        docker compose -f docker-compose.prod.yml exec -T app supervisorctl status || echo "⚠️ Supervisor status check failed"
         
-        echo "🧹 Optimizing caches..."
+        echo "🧹 Clearing all caches..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
-        docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
+        
+        echo "⚡ Optimizing for production..."
+        docker compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+        docker compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+        docker compose -f docker-compose.prod.yml exec -T app php artisan view:cache
         
         echo "🟢 Bringing application online..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan up
         
         echo "🔍 Verifying application is live..."
+        # Give Laravel a moment to fully start
+        sleep 5
+        
+        # Test application response
         if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
             echo "✅ Application is responding properly"
         else
-            echo "❌ Application may still be in maintenance mode"
+            echo "❌ Application health check failed, trying to exit maintenance mode again..."
             docker compose -f docker-compose.prod.yml exec -T app php artisan up
+            sleep 3
+            if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
+                echo "✅ Application is now responding"
+            else
+                echo "❌ Application still not responding properly"
+            fi
+        fi
+        
+        echo "🔍 Final verification - checking external access..."
+        # Test external HTTPS access
+        if curl -f -s -o /dev/null -w "%{http_code}" https://img-optim.xtemos.com/ | grep -q "200"; then
+            echo "✅ External HTTPS access confirmed (200 OK)"
+        else
+            echo "⚠️ External HTTPS access may be failing"
         fi
         
         echo "✅ Zero-downtime deployment completed!"
         echo "📊 Final container status:"
         docker compose -f docker-compose.prod.yml ps
+        
+        echo "👥 Queue worker status:"
+        docker compose -f docker-compose.prod.yml exec -T app ps aux | grep -E "(queue|supervisor)" | grep -v grep || echo "No queue processes found"
 ENDSSH
 }
 
@@ -145,26 +188,57 @@ health_check() {
         docker compose -f docker-compose.prod.yml ps
         
         echo "🔍 Checking application health..."
-        # Test if the application responds
-        if curl -f -s -I http://localhost > /dev/null; then
-            echo "✅ Application is responding"
+        # Test if the application responds locally
+        if docker compose -f docker-compose.prod.yml exec -T app curl -f -s -I http://localhost > /dev/null; then
+            echo "✅ Application is responding locally"
         else
-            echo "❌ Application health check failed"
+            echo "❌ Local application health check failed"
+            exit 1
+        fi
+        
+        echo "🔍 Checking external HTTPS access..."
+        # Test external HTTPS access
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://img-optim.xtemos.com/)
+        if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ External HTTPS access working (HTTP $HTTP_CODE)"
+        else
+            echo "❌ External HTTPS access failed (HTTP $HTTP_CODE)"
             exit 1
         fi
         
         echo "🔍 Checking supervisor status..."
-        docker compose -f docker-compose.prod.yml exec -T app supervisorctl status
+        if docker compose -f docker-compose.prod.yml exec -T app supervisorctl status; then
+            echo "✅ Supervisor is running properly"
+        else
+            echo "❌ Supervisor status check failed"
+            exit 1
+        fi
         
-        echo "🔍 Checking queue worker logs..."
-        docker compose -f docker-compose.prod.yml exec -T app tail -n 5 /tmp/worker.log || echo "⚠️ No worker logs yet"
+        echo "🔍 Checking queue workers..."
+        WORKER_COUNT=$(docker compose -f docker-compose.prod.yml exec -T app ps aux | grep "queue:work" | grep -v grep | wc -l)
+        if [ "$WORKER_COUNT" -ge "2" ]; then
+            echo "✅ Queue workers are running ($WORKER_COUNT workers found)"
+        else
+            echo "❌ Not enough queue workers running (found: $WORKER_COUNT, expected: 2+)"
+            exit 1
+        fi
         
         echo "🔍 Testing Laravel functionality..."
         if docker compose -f docker-compose.prod.yml exec -T app php artisan --version > /dev/null; then
-            echo "✅ Laravel is functioning properly"
+            LARAVEL_VERSION=$(docker compose -f docker-compose.prod.yml exec -T app php artisan --version)
+            echo "✅ Laravel is functioning properly: $LARAVEL_VERSION"
         else
             echo "❌ Laravel command failed"
             exit 1
+        fi
+        
+        echo "🔍 Checking for recent deployment..."
+        CONTAINER_DATE=$(docker compose -f docker-compose.prod.yml exec -T app stat -c %y /var/www/html/DEMO_SETUP.md 2>/dev/null | cut -d' ' -f1 || echo "unknown")
+        TODAY_DATE=$(date +%Y-%m-%d)
+        if [ "$CONTAINER_DATE" = "$TODAY_DATE" ]; then
+            echo "✅ Container has fresh code (updated: $CONTAINER_DATE)"
+        else
+            echo "⚠️ Container may have stale code (last update: $CONTAINER_DATE)"
         fi
 ENDSSH
 }
@@ -179,17 +253,19 @@ rollback() {
         echo "🔙 Rolling back git changes..."
         git reset --hard HEAD~1
         
-        echo "🏗️ Rebuilding with previous version..."
-        docker compose -f docker-compose.prod.yml build app
+        echo "🏗️ Rebuilding with previous version (no cache)..."
+        docker compose -f docker-compose.prod.yml build --no-cache app
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
         echo "⏳ Waiting for rollback container..."
-        sleep 20
+        sleep 25
         
         echo "🔧 Running maintenance tasks..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan migrate:rollback --force || echo "⚠️ Migration rollback failed"
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
-        docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
+        docker compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+        docker compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+        docker compose -f docker-compose.prod.yml exec -T app php artisan view:cache
         docker compose -f docker-compose.prod.yml exec -T app php artisan up
         
         echo "🟢 Rollback completed!"
