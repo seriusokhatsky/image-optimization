@@ -125,6 +125,8 @@ ENVEOF
         echo "📋 Uploading deployment script to server..."
         # Upload the server-side deployment script
         scp deploy-server.sh $REMOTE_USER@$REMOTE_HOST:/var/www/optimizer/
+        
+        echo "🔧 Making script executable..."
         ssh $REMOTE_USER@$REMOTE_HOST "chmod +x /var/www/optimizer/deploy-server.sh"
         
         echo "🚀 Running server-side deployment..."

@@ -34,7 +34,7 @@ fi
 
 # Verify latest changes
 echo "🔍 Verifying changes..."
-if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof14 Deployments" resources/views/demo.blade.php 2>/dev/null; then
+if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof15 Deployments" resources/views/demo.blade.php 2>/dev/null; then
     echo "✅ Latest changes confirmed!"
 else
     echo "⚠️ Changes not found, checking current content..."
