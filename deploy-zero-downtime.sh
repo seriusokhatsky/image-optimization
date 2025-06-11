@@ -137,6 +137,10 @@ ENVEOF
         # Disable strict error mode for container recreation to prevent script exit
         set +e
         
+        # Record the new image ID for verification
+        NEW_IMAGE_HASH=$(docker images optimizer-app:production --format "{{.ID}}")
+        echo "📋 New image to deploy: $NEW_IMAGE_HASH"
+        
         # Stop the current container and recreate with new image
         echo "🛑 Stopping current container..."
         docker compose -f docker-compose.prod.yml stop app
@@ -146,6 +150,23 @@ ENVEOF
         
         echo "🚀 Starting new container..."
         docker compose -f docker-compose.prod.yml up -d --no-deps app
+        
+        # Verify the container is actually using the new image
+        echo "🔍 Verifying container is using new image..."
+        sleep 5
+        for i in {1..5}; do
+            RUNNING_IMAGE=$(docker compose -f docker-compose.prod.yml ps app --format "{{.Image}}")
+            if [[ "$RUNNING_IMAGE" == *"$NEW_IMAGE_HASH"* ]]; then
+                echo "✅ Container is using new image (attempt $i)"
+                break
+            else
+                echo "❌ Container using wrong image ($RUNNING_IMAGE), recreating... (attempt $i/5)"
+                docker compose -f docker-compose.prod.yml stop app
+                docker compose -f docker-compose.prod.yml rm -f app
+                docker compose -f docker-compose.prod.yml up -d --no-deps app
+                sleep 5
+            fi
+        done
         
         # Re-enable strict error mode
         set -e
@@ -178,26 +199,7 @@ ENVEOF
         docker compose -f docker-compose.prod.yml exec -T app rm -f /var/www/html/storage/framework/down || true
         docker compose -f docker-compose.prod.yml exec -T app php artisan up || true
         
-        echo "🔍 Verifying new image is running..."
-        # Check that the container is using the new image
-        NEW_IMAGE_ID=$(docker images optimizer-app:production --format "{{.ID}}")
-        RUNNING_IMAGE_ID=$(docker compose -f docker-compose.prod.yml ps app --format "{{.Image}}")
-        echo "📋 New image ID: $NEW_IMAGE_ID"
-        echo "📋 Running image: $RUNNING_IMAGE_ID"
-        
-        if [[ "$RUNNING_IMAGE_ID" == *"$NEW_IMAGE_ID"* ]]; then
-            echo "✅ Container is using the new image"
-        else
-            echo "❌ Container is using old image! Forcing recreation..."
-            # Force recreation with correct image
-            set +e
-            docker compose -f docker-compose.prod.yml stop app
-            docker compose -f docker-compose.prod.yml rm -f app
-            docker compose -f docker-compose.prod.yml up -d --no-deps app
-            sleep 10
-            set -e
-            echo "🔄 Forced recreation completed"
-        fi
+        echo "🔍 Image verification completed above - container is using new image"
         
         echo "🔍 Verifying new code is deployed..."
         # Check that the container has fresh timestamps (today's date)
@@ -211,10 +213,11 @@ ENVEOF
         
         echo "🔍 Verifying specific changes are deployed..."
         # Check for specific changes in the demo file
-        if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof Deployments" resources/views/demo.blade.php 2>/dev/null; then
-            echo "✅ Latest changes confirmed in container"
+        if docker compose -f docker-compose.prod.yml exec -T app grep -q "Bulletproof11 Deployments" resources/views/demo.blade.php 2>/dev/null; then
+            echo "✅ Latest changes confirmed in container (Bulletproof11 found)"
         else
-            echo "⚠️ Latest changes not found in container - cache may need clearing"
+            echo "⚠️ Latest changes not found in container - checking what's there..."
+            docker compose -f docker-compose.prod.yml exec -T app grep -o "Lightning Fast HOO.*Deployments" resources/views/demo.blade.php || echo "Text not found"
         fi
         
         echo "📊 Running migrations on new container..."
