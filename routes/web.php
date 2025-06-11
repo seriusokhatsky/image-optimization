@@ -16,3 +16,13 @@ Route::middleware(['throttle:60,1'])->group(function () {
 // Download routes (from existing API controller)
 Route::get('/download/{taskId}', [App\Http\Controllers\OptimizeController::class, 'download'])->name('demo.download');
 Route::get('/download/{taskId}/webp', [App\Http\Controllers\OptimizeController::class, 'downloadWebp'])->name('demo.download.webp');
+
+// Add this route for health checks
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'healthy',
+        'timestamp' => now(),
+        'app' => config('app.name'),
+        'environment' => app()->environment(),
+    ]);
+});

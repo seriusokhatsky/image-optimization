@@ -16,6 +16,7 @@ services:
       - DB_DATABASE=${DB_DATABASE}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
+      - QUEUE_CONNECTION=database
     # volumes:
       # - './storage/app:/var/www/html/storage/app'
       # - './storage/logs:/var/www/html/storage/logs'
@@ -25,6 +26,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    # The queue workers run inside this container via Supervisor
 
   mysql:
     image: 'mysql/mysql-server:8.0'
