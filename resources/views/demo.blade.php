@@ -44,7 +44,7 @@
             </p>
             <div class="inline-flex items-center bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium mb-2">
                 <i class="fas fa-rocket text-purple-600 mr-2"></i>
-                ⚡ Lightning Fast HOO • Bulletproof13 Deployments ⚡
+                ⚡ Lightning Fast HOO • Bulletproof14 Deployments ⚡
             </div>
             <p class="text-sm text-gray-500">
                 <i class="fas fa-shield-alt text-green-500"></i>
