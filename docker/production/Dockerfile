@@ -174,7 +174,13 @@ COPY --from=php-dependencies /var/www/html/vendor ./vendor
 # Copy built assets from asset-builder layer
 COPY --from=asset-builder /var/www/html/public ./public
 
+# Build args for cache busting when code changes
+ARG BUILD_TIMESTAMP=unknown
+ARG CACHEBUST=unknown
+
 # Copy application code (this is the only layer that changes frequently)
+# Cache will be busted when BUILD_TIMESTAMP or CACHEBUST changes
+RUN echo "Build timestamp: $BUILD_TIMESTAMP, Git commit: $CACHEBUST"
 COPY app/ ./app/
 COPY bootstrap/ ./bootstrap/
 COPY config/ ./config/

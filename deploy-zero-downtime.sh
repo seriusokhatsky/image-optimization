@@ -98,8 +98,12 @@ ENVEOF
         echo "🏗️ Building new image with optimized multi-stage caching..."
         echo "📦 Using multi-stage build (dependencies cached automatically)..."
         # Build with multi-stage Dockerfile - dependencies are cached in separate layers
+        # Use build args to ensure fresh code is always copied
+        BUILD_TIMESTAMP=$(date +%s)
         docker build \
             --target production \
+            --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP \
+            --build-arg CACHEBUST=$(git rev-parse HEAD) \
             -t optimizer-app:production \
             -f docker/production/Dockerfile \
             .
@@ -125,7 +129,21 @@ ENVEOF
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
         echo "⏳ Waiting for container to be ready..."
-        sleep 30
+        # Wait for the container to be fully started and responsive
+        for i in {1..12}; do
+            if docker compose -f docker-compose.prod.yml exec -T app php -v > /dev/null 2>&1; then
+                echo "✅ Container is ready (attempt $i)"
+                break
+            else
+                echo "⏳ Waiting for container... (attempt $i/12)"
+                sleep 5
+            fi
+        done
+        
+        echo "🔧 Ensuring maintenance mode is off immediately after container start..."
+        # Force remove maintenance mode file and bring app online
+        docker compose -f docker-compose.prod.yml exec -T app rm -f /var/www/html/storage/framework/down || true
+        docker compose -f docker-compose.prod.yml exec -T app php artisan up || true
         
         echo "🔍 Verifying new code is deployed..."
         # Check that the container has fresh timestamps (today's date)
@@ -145,33 +163,55 @@ ENVEOF
         # Check that supervisor started the queue workers
         docker compose -f docker-compose.prod.yml exec -T app supervisorctl status || echo "⚠️ Supervisor status check failed"
         
-        echo "🧹 Clearing all caches..."
+        echo "🧹 Aggressively clearing ALL caches and compiled views..."
+        # Clear everything to ensure fresh state
         docker compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
+        docker compose -f docker-compose.prod.yml exec -T app php artisan view:clear
+        docker compose -f docker-compose.prod.yml exec -T app php artisan config:clear
+        docker compose -f docker-compose.prod.yml exec -T app php artisan route:clear
+        docker compose -f docker-compose.prod.yml exec -T app php artisan cache:clear
+        
+        # Remove compiled view files manually as extra precaution
+        docker compose -f docker-compose.prod.yml exec -T app find /var/www/html/storage/framework/views -name "*.php" -delete || true
         
         echo "⚡ Optimizing for production..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan config:cache
         docker compose -f docker-compose.prod.yml exec -T app php artisan route:cache
         docker compose -f docker-compose.prod.yml exec -T app php artisan view:cache
         
-        echo "🟢 Bringing application online..."
-        docker compose -f docker-compose.prod.yml exec -T app php artisan up
+        echo "🟢 Final step - ensuring application is online..."
+        # Multiple attempts to ensure the app is online
+        for i in {1..5}; do
+            docker compose -f docker-compose.prod.yml exec -T app rm -f /var/www/html/storage/framework/down || true
+            docker compose -f docker-compose.prod.yml exec -T app php artisan up
+            sleep 2
+            
+            # Test if the app responds
+            if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
+                echo "✅ Application is online (attempt $i)"
+                break
+            else
+                echo "🔄 App not responding, retrying... (attempt $i/5)"
+            fi
+        done
         
         echo "🔍 Verifying application is live..."
         # Give Laravel a moment to fully start
         sleep 5
         
-        # Test application response with retry logic
-        for i in {1..3}; do
+        # Test application response with aggressive retry logic
+        for i in {1..5}; do
             if docker compose -f docker-compose.prod.yml exec -T app curl -f -s http://localhost > /dev/null; then
                 echo "✅ Application is responding properly (attempt $i)"
                 break
             else
-                echo "⚠️ Application health check failed (attempt $i/3)"
-                if [ $i -lt 3 ]; then
-                    echo "🔄 Ensuring maintenance mode is off..."
-                    docker compose -f docker-compose.prod.yml exec -T app php artisan up
-                    sleep 3
-                fi
+                echo "⚠️ Application health check failed (attempt $i/5)"
+                echo "🔄 Aggressively fixing maintenance mode..."
+                # Force remove maintenance mode file and restart Laravel
+                docker compose -f docker-compose.prod.yml exec -T app rm -f /var/www/html/storage/framework/down || true
+                docker compose -f docker-compose.prod.yml exec -T app php artisan up
+                docker compose -f docker-compose.prod.yml exec -T app php artisan cache:clear || true
+                sleep 3
             fi
         done
         
@@ -210,8 +250,39 @@ ENVEOF
         echo "👥 Queue worker status:"
         docker compose -f docker-compose.prod.yml exec -T app ps aux | grep -E "(queue|supervisor)" | grep -v grep || echo "No queue processes found"
         
-        echo "🔧 Final safety check - ensuring maintenance mode is off..."
-        docker compose -f docker-compose.prod.yml exec -T app php artisan up
+        echo "🔧 Final comprehensive fix - eliminating 503 errors permanently..."
+        # Comprehensive fix to prevent 503 errors
+        for i in {1..3}; do
+            echo "🔄 Fix attempt $i/3..."
+            
+            # Remove any maintenance mode files
+            docker compose -f docker-compose.prod.yml exec -T app rm -f /var/www/html/storage/framework/down || true
+            
+            # Bring application online
+            docker compose -f docker-compose.prod.yml exec -T app php artisan up
+            
+            # Clear all caches to ensure fresh state
+            docker compose -f docker-compose.prod.yml exec -T app php artisan cache:clear || true
+            docker compose -f docker-compose.prod.yml exec -T app php artisan config:clear || true
+            docker compose -f docker-compose.prod.yml exec -T app php artisan route:clear || true
+            docker compose -f docker-compose.prod.yml exec -T app php artisan view:clear || true
+            
+            # Re-optimize
+            docker compose -f docker-compose.prod.yml exec -T app php artisan config:cache || true
+            docker compose -f docker-compose.prod.yml exec -T app php artisan route:cache || true
+            docker compose -f docker-compose.prod.yml exec -T app php artisan view:cache || true
+            
+            sleep 3
+            
+            # Test external access
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://img-optim.xtemos.com/)
+            if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Fix successful! Application is responding (HTTP $HTTP_CODE)"
+                break
+            else
+                echo "⚠️ Still getting HTTP $HTTP_CODE, trying again..."
+            fi
+        done
         
         echo "✅ All deployment steps completed successfully!"
 ENDSSH
