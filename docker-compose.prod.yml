@@ -3,6 +3,7 @@ services:
     build:
       context: '.'
       dockerfile: docker/production/Dockerfile
+      target: production
     image: 'optimizer-app:production'
     container_name: optimizer-app
     restart: unless-stopped

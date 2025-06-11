@@ -1,4 +1,7 @@
-FROM ubuntu:24.04
+# ===================================
+# Stage 1: Base Dependencies Layer
+# ===================================
+FROM ubuntu:24.04 AS base-dependencies
 
 LABEL maintainer="Laravel Optimizer Production"
 
@@ -7,12 +10,8 @@ ARG WWWUSER=1337
 ARG NODE_VERSION=22
 ARG MYSQL_CLIENT="mysql-client"
 
-WORKDIR /var/www/html
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
-ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=80"
-ENV SUPERVISOR_PHP_USER="www-data"
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
@@ -114,20 +113,76 @@ RUN userdel www-data 2>/dev/null || true && \
     groupadd -g $WWWGROUP www-data && \
     useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER www-data
 
-# Copy application files
-COPY . /var/www/html
+# ===================================
+# Stage 2: PHP Dependencies Layer
+# ===================================
+FROM base-dependencies AS php-dependencies
 
-# Set ownership and permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
+WORKDIR /var/www/html
+
+# Copy only dependency files for better caching
+COPY composer.json composer.lock ./
 
 # Install PHP dependencies (production only)
-RUN cd /var/www/html && composer install --optimize-autoloader --no-dev --no-interaction --no-progress --prefer-dist
+# This layer will be cached unless composer.json or composer.lock changes
+RUN composer install --optimize-autoloader --no-dev --no-interaction --no-progress --prefer-dist --no-scripts
 
-# Install and build frontend assets
-RUN cd /var/www/html && npm ci && npm run build && rm -rf node_modules
+# ===================================
+# Stage 3: Node Dependencies Layer
+# ===================================
+FROM base-dependencies AS node-dependencies
+
+WORKDIR /var/www/html
+
+# Copy only Node dependency files for better caching
+COPY package.json package-lock.json ./
+
+# Install Node dependencies
+# This layer will be cached unless package.json or package-lock.json changes
+RUN npm ci --only=production
+
+# ===================================
+# Stage 4: Asset Building Layer
+# ===================================
+FROM node-dependencies AS asset-builder
+
+# Copy source files needed for asset building
+COPY resources/ ./resources/
+COPY public/ ./public/
+COPY vite.config.js ./
+COPY package.json package-lock.json ./
+
+# Install all dependencies (including dev dependencies for building)
+RUN npm ci
+
+# Build frontend assets
+RUN npm run build
+
+# ===================================
+# Stage 5: Final Production Image
+# ===================================
+FROM base-dependencies AS production
+
+WORKDIR /var/www/html
+
+ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=80"
+ENV SUPERVISOR_PHP_USER="www-data"
+
+# Copy vendor dependencies from php-dependencies layer
+COPY --from=php-dependencies /var/www/html/vendor ./vendor
+
+# Copy built assets from asset-builder layer
+COPY --from=asset-builder /var/www/html/public ./public
+
+# Copy application code (this is the only layer that changes frequently)
+COPY app/ ./app/
+COPY bootstrap/ ./bootstrap/
+COPY config/ ./config/
+COPY database/ ./database/
+COPY routes/ ./routes/
+COPY storage/ ./storage/
+COPY resources/ ./resources/
+COPY artisan composer.json composer.lock ./
 
 # Copy production configuration files
 COPY docker/production/php.ini /etc/php/8.4/cli/conf.d/99-production.ini
@@ -136,6 +191,12 @@ COPY docker/production/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/production/start-container /usr/local/bin/start-container
 
 RUN chmod +x /usr/local/bin/start-container
+
+# Set ownership and permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html \
+    && chmod -R 775 /var/www/html/storage \
+    && chmod -R 775 /var/www/html/bootstrap/cache
 
 # Create log directories with proper permissions
 RUN mkdir -p /var/log/supervisor /var/log/php && \

@@ -46,6 +46,13 @@ deploy_zero_downtime() {
         git checkout main
         git pull origin main
         
+        echo "🔧 Setting up build scripts..."
+        # Make build script executable if it exists
+        if [ -f "docker/production/build-optimized.sh" ]; then
+            chmod +x docker/production/build-optimized.sh
+            echo "✅ Optimized build script is ready"
+        fi
+        
         echo "💾 Preserving environment configuration..."
         # Check if .env exists and has APP_KEY, if not create it
         if [ ! -f ".env" ] || ! grep -q "^APP_KEY=base64:" .env; then
@@ -88,9 +95,14 @@ ENVEOF
             fi
         fi
         
-        echo "🏗️ Building new image with fresh cache..."
-        # Force rebuild without cache to ensure latest code is included
-        docker compose -f docker-compose.prod.yml build --no-cache app
+        echo "🏗️ Building new image with optimized multi-stage caching..."
+        echo "📦 Using multi-stage build (dependencies cached automatically)..."
+        # Build with multi-stage Dockerfile - dependencies are cached in separate layers
+        docker build \
+            --target production \
+            -t optimizer-app:production \
+            -f docker/production/Dockerfile \
+            .
         
         echo "🔧 Putting app in maintenance mode..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan down --refresh=15 || echo "⚠️ Could not enable maintenance mode (app may not be running)"
@@ -253,8 +265,13 @@ rollback() {
         echo "🔙 Rolling back git changes..."
         git reset --hard HEAD~1
         
-        echo "🏗️ Rebuilding with previous version (no cache)..."
-        docker compose -f docker-compose.prod.yml build --no-cache app
+        echo "🏗️ Rebuilding with previous version..."
+        echo "📦 Using multi-stage build for rollback..."
+        docker build \
+            --target production \
+            -t optimizer-app:production \
+            -f docker/production/Dockerfile \
+            .
         docker compose -f docker-compose.prod.yml up -d --no-deps app
         
         echo "⏳ Waiting for rollback container..."
