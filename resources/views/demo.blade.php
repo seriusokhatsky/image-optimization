@@ -42,10 +42,6 @@
             <p class="text-lg text-gray-600 mb-2">
                 Compress JPEG, PNG, GIF and WebP images with optimal quality
             </p>
-            <div class="inline-flex items-center bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium mb-2">
-                <i class="fas fa-rocket text-purple-600 mr-2"></i>
-                ⚡ Lightning Fast HOO • Bulletproof20 Deployments ⚡
-            </div>
             <p class="text-sm text-gray-500">
                 <i class="fas fa-shield-alt text-green-500"></i>
                 Maximum 10 uploads per hour • Files deleted after 1 hour • Free to use
