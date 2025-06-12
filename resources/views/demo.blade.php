@@ -37,7 +37,7 @@
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-800 mb-4">
                 <i class="fas fa-compress-alt text-blue-600 mr-3"></i>
-                Image Optimizer (by Xtemos)
+                Image Optimizer
             </h1>
             <p class="text-lg text-gray-600 mb-2">
                 Compress JPEG, PNG, GIF and WebP images with optimal quality
