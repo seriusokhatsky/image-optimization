@@ -33,16 +33,6 @@ services:
       - SESSION_DRIVER=database
       - SESSION_LIFETIME=120
       - BROADCAST_DRIVER=log
-      
-      # Mail Configuration (optional)
-      - MAIL_MAILER=${MAIL_MAILER:-smtp}
-      - MAIL_HOST=${MAIL_HOST:-mailpit}
-      - MAIL_PORT=${MAIL_PORT:-1025}
-      - MAIL_USERNAME=${MAIL_USERNAME:-}
-      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
-      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-}
-      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-hello@example.com}
-      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Optimizer}
     networks:
       - optimizer-network
     depends_on:

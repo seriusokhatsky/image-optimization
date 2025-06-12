@@ -21,7 +21,7 @@ Dockerfile
 sail
 
 # Deployment scripts (not needed in container)
-deploy.sh
+deploy-first.sh
 deploy-zero-downtime.sh
 copy-ssl.sh
 
