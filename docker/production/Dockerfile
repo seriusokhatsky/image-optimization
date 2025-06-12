@@ -150,7 +150,6 @@ FROM node-dependencies AS asset-builder
 COPY resources/ ./resources/
 COPY public/ ./public/
 COPY vite.config.js ./
-COPY package.json package-lock.json ./
 
 # Install all dependencies (including dev dependencies for building)
 RUN npm ci
