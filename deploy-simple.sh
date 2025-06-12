@@ -51,11 +51,11 @@ deploy() {
             -f docker/production/Dockerfile \
             .
         
-        echo "🔧 Enabling maintenance mode..."
-        docker compose -f docker-compose.prod.yml exec -T app php artisan down --refresh=15 || echo "App may not be running yet"
+        echo "🔧 Skipping maintenance mode (can cause hangs)..."
         
         echo "🚀 Deploying new containers..."
         docker compose -f docker-compose.prod.yml up -d --no-deps app
+        echo "✅ Container deployment completed"
         
         echo "📦 Running Laravel maintenance tasks..."
         docker compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
