@@ -43,16 +43,11 @@ services:
       - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-}
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-hello@example.com}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Optimizer}
-    # volumes:
-      # - './storage/app:/var/www/html/storage/app'
-      # - './storage/logs:/var/www/html/storage/logs'
-      # - 'app-cache:/var/www/html/bootstrap/cache'
     networks:
       - optimizer-network
     depends_on:
       mysql:
         condition: service_healthy
-    # The queue workers run inside this container via Supervisor
 
   mysql:
     image: 'mysql/mysql-server:8.0'
