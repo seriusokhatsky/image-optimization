@@ -83,7 +83,7 @@
                 <i class="fas fa-list text-blue-600 mr-2"></i>
                 Processing Queue
             </h3>
-            <div id="queueItems"></div>
+            <div id="queueItems" class="space-y-4"></div>
         </div>
 
         <!-- Error Messages -->
@@ -157,6 +157,12 @@
         // Quality slider
         qualitySlider.addEventListener('input', function() {
             qualityValue.textContent = this.value;
+        });
+
+        // Prevent quality slider area from triggering file upload
+        const qualityContainer = qualitySlider.closest('.mb-6');
+        qualityContainer.addEventListener('click', function(e) {
+            e.stopPropagation();
         });
 
         // Upload area events
@@ -254,7 +260,7 @@
             const div = document.createElement('div');
             div.className = 'bg-white rounded-lg shadow p-4 fade-in';
             div.innerHTML = `
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
                         <i class="fas fa-file-image text-blue-500 text-xl"></i>
                         <div>
@@ -267,12 +273,12 @@
                         <span class="text-sm text-blue-600 ml-2">Uploading...</span>
                     </div>
                 </div>
-                <div class="progress-container">
+                <div class="progress-container mb-4">
                     <div class="w-full bg-gray-200 rounded-full h-2">
                         <div class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
                     </div>
                 </div>
-                <div class="results mt-3" style="display: none;"></div>
+                <div class="results mt-4" style="display: none;"></div>
             `;
             return div;
         }
@@ -319,7 +325,7 @@
                 <div class="grid md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                     <div>
                         <h5 class="font-medium text-gray-800 mb-2">Optimization Results</h5>
-                        <div class="space-y-1 text-sm">
+                        <div class="space-y-3 text-sm">
                             <div class="flex justify-between">
                                 <span class="text-gray-600">Original Size:</span>
                                 <span class="font-medium">${data.original_file.size_formatted}</span>
