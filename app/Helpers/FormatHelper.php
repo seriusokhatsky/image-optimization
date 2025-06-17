@@ -35,8 +35,12 @@ class FormatHelper
      *
      * @return string The formatted byte string
      */
-    public static function bytes(int $bytes, int $precision = 2): string
+    public static function bytes(?int $bytes, int $precision = 2): string
     {
+        if ($bytes === null || $bytes === 0) {
+            return '0 B';
+        }
+        
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, $precision) . ' GB';
         } elseif ($bytes >= 1048576) {

@@ -30,8 +30,7 @@ class ImageUploadRateLimit
         $key = 'image_uploads:' . $request->ip();
         
         if (RateLimiter::tooManyAttempts($key, 10)) {
-            $availableAt = RateLimiter::availableAt($key);
-            $retryAfter = $availableAt - time();
+            $retryAfter = RateLimiter::availableIn($key);
             
             if ($request->expectsJson()) {
                 return response()->json(

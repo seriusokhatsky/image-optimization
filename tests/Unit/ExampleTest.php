@@ -1,5 +1,9 @@
 <?php
 
-test('that true is true', function () {
-    expect(true)->toBeTrue();
+describe('Basic Unit Tests', function () {
+    it('performs basic assertions', function () {
+        expect(true)->toBe(true);
+        expect(1 + 1)->toBe(2);
+        expect('hello')->toBe('hello');
+    });
 });
