@@ -6,6 +6,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\FormatHelper;
 use App\Jobs\OptimizeFileJob;
 use App\Models\OptimizationTask;
 use App\Services\OptimizationLogger;
@@ -83,7 +84,7 @@ class HomeController extends Controller
             'original_file' => [
                 'name' => $originalName,
                 'size' => $originalSize,
-                'size_formatted' => $this->formatBytes($originalSize),
+                'size_formatted' => FormatHelper::bytes($originalSize),
             ],
         ]);
     }
@@ -120,7 +121,7 @@ class HomeController extends Controller
             'original_file' => [
                 'name' => $task->original_filename,
                 'size' => $task->original_size,
-                'size_formatted' => $this->formatBytes($task->original_size),
+                'size_formatted' => FormatHelper::bytes($task->original_size),
             ],
         ];
 
@@ -128,11 +129,11 @@ class HomeController extends Controller
             $response['optimization'] = [
                 'compression_ratio' => $task->compression_ratio,
                 'size_reduction' => $task->size_reduction,
-                'size_reduction_formatted' => $this->formatBytes($task->size_reduction),
+                'size_reduction_formatted' => FormatHelper::bytes($task->size_reduction),
                 'algorithm' => $task->algorithm,
                 'processing_time' => $task->processing_time,
                 'optimized_size' => $task->optimized_size,
-                'optimized_size_formatted' => $this->formatBytes($task->optimized_size),
+                'optimized_size_formatted' => FormatHelper::bytes($task->optimized_size),
             ];
 
             // Add size increase warning if optimization didn't reduce size
@@ -146,9 +147,9 @@ class HomeController extends Controller
                 $response['webp'] = [
                     'compression_ratio' => $task->webp_compression_ratio,
                     'size_reduction' => $task->webp_size_reduction,
-                    'size_reduction_formatted' => $this->formatBytes($task->webp_size_reduction),
+                    'size_reduction_formatted' => FormatHelper::bytes($task->webp_size_reduction),
                     'webp_size' => $task->webp_size,
-                    'webp_size_formatted' => $this->formatBytes($task->webp_size),
+                    'webp_size_formatted' => FormatHelper::bytes($task->webp_size),
                 ];
 
                 if ($task->webp_size_reduction <= 0) {
@@ -165,23 +166,4 @@ class HomeController extends Controller
         return response()->json($response);
     }
 
-    /**
-     * Format bytes into human readable format.
-     *
-     * @param int $bytes The number of bytes
-     *
-     * @return string Formatted size string
-     */
-    private function formatBytes(int $bytes): string
-    {
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        } else {
-            return $bytes . ' B';
-        }
-    }
 } 
