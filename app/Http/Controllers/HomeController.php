@@ -34,17 +34,7 @@ class HomeController extends Controller
         return view('demo');
     }
 
-    /**
-     * Display all optimization tasks as a table.
-     *
-     * @return View
-     */
-    public function listTasks(): View
-    {
-        $tasks = OptimizationTask::orderBy('created_at', 'desc')->paginate(20);
-        
-        return view('list-tasks', compact('tasks'));
-    }
+
 
     /**
      * Handle file upload from the demo interface.
