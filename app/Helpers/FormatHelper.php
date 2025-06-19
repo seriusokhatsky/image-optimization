@@ -5,26 +5,10 @@
  *
  * Helper class for formatting various data types.
  *
- * @category Helpers
- * @package  Optimizer
- * @author   Your Name <your@email.com>
- * @license  MIT License
- * @link     https://yourprojecturl.com
  */
 
 namespace App\Helpers;
 
-/**
- * Format Helper Class
- *
- * Provides static methods for formatting data.
- *
- * @category Helpers
- * @package  Optimizer
- * @author   Your Name <your@email.com>
- * @license  MIT License
- * @link     https://yourprojecturl.com
- */
 class FormatHelper
 {
     /**

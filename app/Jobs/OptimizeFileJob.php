@@ -41,10 +41,8 @@ class OptimizeFileJob implements ShouldQueue
 
             // Get the file path for processing
             $fullPath = Storage::disk('public')->path($this->task->original_path);
-            $extension = pathinfo($this->task->original_filename, PATHINFO_EXTENSION);
 
             // Create a temporary UploadedFile object for the service
-            $tempFile = new \Illuminate\Http\File($fullPath);
             $uploadedFile = new UploadedFile(
                 $fullPath,
                 $this->task->original_filename,
@@ -56,8 +54,6 @@ class OptimizeFileJob implements ShouldQueue
             // Perform optimization
             $optimizationResult = $optimizationService->optimize(
                 $uploadedFile,
-                $extension,
-                $this->task->original_path,
                 $this->task->quality
             );
 

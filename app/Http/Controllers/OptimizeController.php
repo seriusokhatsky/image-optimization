@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Jobs\OptimizeFileJob;
 use App\Models\OptimizationTask;
-use App\Services\FileOptimizationService;
 use App\Services\OptimizationLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +16,6 @@ class OptimizeController extends Controller
      * Create a new controller instance.
      */
     public function __construct(
-        private FileOptimizationService $optimizationService,
         private OptimizationLogger $logger
     ) {}
 
