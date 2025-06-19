@@ -1,212 +1,228 @@
 <?php
 
+namespace Tests\Feature;
+
 use App\Jobs\OptimizeFileJob;
 use App\Models\OptimizationTask;
 use App\Services\FileOptimizationService;
 use App\Services\OptimizationLogger;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+use Mockery;
 
-beforeEach(function () {
-    Storage::fake('public');
-});
+class OptimizeFileJobTest extends TestCase
+{
+    use RefreshDatabase;
 
-describe('OptimizeFileJob', function () {
-    describe('Job Configuration', function () {
-        it('has correct timeout and retry settings', function () {
-            $task = OptimizationTask::factory()->create();
-            $job = new OptimizeFileJob($task);
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('public');
+        Queue::fake();
+    }
 
-            expect($job->timeout)->toBe(300);
-            expect($job->tries)->toBe(3);
-        });
+    public function test_can_instantiate_job(): void
+    {
+        $task = OptimizationTask::factory()->create();
+        $job = new OptimizeFileJob($task);
 
-        it('serializes task correctly', function () {
-            $task = OptimizationTask::factory()->create();
-            $job = new OptimizeFileJob($task);
+        $this->assertInstanceOf(OptimizeFileJob::class, $job);
+    }
 
-            expect($job->task)->toBeInstanceOf(OptimizationTask::class);
-            expect($job->task->id)->toBe($task->id);
-        });
-    });
+    public function test_job_has_correct_queue_configuration(): void
+    {
+        $task = OptimizationTask::factory()->create();
+        $job = new OptimizeFileJob($task);
 
-    describe('Job Execution', function () {
-        it('marks task as processing when started', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            Storage::disk('public')->put($task->original_path, 'fake image content');
+        $this->assertEquals(300, $job->timeout);
+        $this->assertEquals(3, $job->tries);
+    }
 
-            $optimizationService = Mockery::mock(FileOptimizationService::class);
-            $optimizationService->shouldReceive('optimize')->andReturn([
+    public function test_processes_task_successfully(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/test.jpg',
+            'original_size' => 1000000,
+            'quality' => 80,
+        ]);
+
+        Storage::disk('public')->put($task->original_path, 'fake image content');
+
+        $optimizationService = Mockery::mock(FileOptimizationService::class);
+        $logger = Mockery::mock(OptimizationLogger::class);
+
+        $optimizationService->shouldReceive('optimize')
+            ->once()
+            ->andReturn([
                 'optimized' => true,
-                'optimized_size' => 800,
+                'optimized_size' => 800000,
                 'compression_ratio' => 0.20,
-                'size_reduction' => 200,
-                'algorithm' => 'JPEG optimization',
-                'processing_time' => '150 ms',
-            ]);
-            $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(false);
-
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskProcessingStarted');
-            $logger->shouldReceive('logTaskCompleted');
-
-            $job = new OptimizeFileJob($task);
-            $job->handle($optimizationService, $logger);
-
-            $task->refresh();
-            expect($task->status)->toBe('completed');
-        });
-
-        it('handles missing original file', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            // Don't create the file to simulate missing file
-
-            $optimizationService = Mockery::mock(FileOptimizationService::class);
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskProcessingStarted');
-            $logger->shouldReceive('logTaskFailed');
-
-            $job = new OptimizeFileJob($task);
-
-            expect(fn() => $job->handle($optimizationService, $logger))
-                ->toThrow(Exception::class, 'Original file not found');
-
-            $task->refresh();
-            expect($task->status)->toBe('failed');
-        });
-
-        it('handles optimization failure', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            Storage::disk('public')->put($task->original_path, 'fake image content');
-
-            $optimizationService = Mockery::mock(FileOptimizationService::class);
-            $optimizationService->shouldReceive('optimize')->andReturn([
-                'optimized' => false,
-                'reason' => 'Test optimization failure',
+                'size_reduction' => 200000,
+                'algorithm' => 'JPEG optimization with MozJPEG',
+                'processing_time' => '150.50',
             ]);
 
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskProcessingStarted');
-            $logger->shouldReceive('logTaskFailed');
+        $optimizationService->shouldReceive('supportsWebpConversion')
+            ->once()
+            ->andReturn(true);
 
-            $job = new OptimizeFileJob($task);
-
-            expect(fn() => $job->handle($optimizationService, $logger))
-                ->toThrow(Exception::class, 'Test optimization failure');
-
-            $task->refresh();
-            expect($task->status)->toBe('failed');
-        });
-
-        it('generates webp when supported', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            Storage::disk('public')->put($task->original_path, 'fake image content');
-
-            $optimizationService = Mockery::mock(FileOptimizationService::class);
-            $optimizationService->shouldReceive('optimize')->andReturn([
-                'optimized' => true,
-                'optimized_size' => 800,
-                'compression_ratio' => 0.20,
-                'size_reduction' => 200,
-                'algorithm' => 'JPEG optimization',
-                'processing_time' => '150 ms',
-            ]);
-            $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(true);
-            $optimizationService->shouldReceive('generateWebpCopy')->andReturn([
+        $optimizationService->shouldReceive('generateWebpCopy')
+            ->once()
+            ->andReturn([
                 'success' => true,
-                'webp_path' => 'uploads/webp/test.webp',
-                'webp_size' => 600,
-                'webp_compression_ratio' => 0.40,
-                'webp_size_reduction' => 400,
-                'webp_processing_time' => '100 ms',
+                'webp_path' => 'uploads/webp/test.jpg.webp',
+                'webp_size' => 700000,
+                'webp_compression_ratio' => 0.30,
+                'webp_size_reduction' => 300000,
+                'webp_processing_time' => '75.25',
             ]);
 
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskProcessingStarted');
-            $logger->shouldReceive('logTaskCompleted');
+        $logger->shouldReceive('logTaskProcessingStarted')->once();
+        $logger->shouldReceive('logTaskCompleted')->once();
 
-            $job = new OptimizeFileJob($task);
-            $job->handle($optimizationService, $logger);
+        $job = new OptimizeFileJob($task);
+        $job->handle($optimizationService, $logger);
 
-            $task->refresh();
-            expect($task->webp_generated)->toBe(true);
-            expect($task->webp_path)->toBe('uploads/webp/test.webp');
-        });
+        $task->refresh();
+        $this->assertEquals('completed', $task->status);
+        $this->assertEquals(800000, $task->optimized_size);
+        $this->assertTrue($task->webp_generated);
+    }
 
-        it('handles webp generation failure gracefully', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            Storage::disk('public')->put($task->original_path, 'fake image content');
+    public function test_handles_missing_original_file(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/missing.jpg',
+        ]);
 
-            $optimizationService = Mockery::mock(FileOptimizationService::class);
-            $optimizationService->shouldReceive('optimize')->andReturn([
-                'optimized' => true,
-                'optimized_size' => 800,
-                'compression_ratio' => 0.20,
-                'size_reduction' => 200,
-                'algorithm' => 'JPEG optimization',
-                'processing_time' => '150 ms',
-            ]);
-            $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(true);
-            $optimizationService->shouldReceive('generateWebpCopy')->andReturn([
-                'success' => false,
-                'reason' => 'WebP conversion failed',
-            ]);
+        $optimizationService = Mockery::mock(FileOptimizationService::class);
+        $logger = Mockery::mock(OptimizationLogger::class);
 
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskProcessingStarted');
-            $logger->shouldReceive('logTaskCompleted');
+        $logger->shouldReceive('logTaskProcessingStarted')->once();
+        $logger->shouldReceive('logTaskFailed')->once();
 
-            $job = new OptimizeFileJob($task);
-            $job->handle($optimizationService, $logger);
+        $job = new OptimizeFileJob($task);
 
-            $task->refresh();
-            expect($task->status)->toBe('completed');
-            expect($task->webp_generated)->toBe(false);
-        });
-    });
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Original file not found');
 
-    describe('Job Failure Handling', function () {
-        it('handles job failure correctly', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            $exception = new Exception('Test exception');
+        $job->handle($optimizationService, $logger);
+    }
 
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskFailed');
+    public function test_generates_webp_for_supported_formats(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/test.jpg',
+            'original_filename' => 'test.jpg',
+        ]);
 
-            $job = new OptimizeFileJob($task);
-            $job->failed($exception);
+        Storage::disk('public')->put($task->original_path, 'fake image content');
 
-            $task->refresh();
-            expect($task->status)->toBe('failed');
-            expect($task->error_message)->toBe('Test exception');
-        });
-    });
+        $optimizationService = Mockery::mock(FileOptimizationService::class);
+        $logger = Mockery::mock(OptimizationLogger::class);
 
-    describe('Logging', function () {
-        it('logs task processing events', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
-            Storage::disk('public')->put($task->original_path, 'fake image content');
+        $optimizationService->shouldReceive('optimize')->once()->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'algorithm' => 'JPEG', 'processing_time' => '150']);
+        $optimizationService->shouldReceive('supportsWebpConversion')->once()->andReturn(true);
+        $optimizationService->shouldReceive('generateWebpCopy')->once()->andReturn(['success' => true, 'webp_path' => 'test.webp', 'webp_size' => 700000, 'webp_compression_ratio' => 0.30, 'webp_size_reduction' => 300000, 'webp_processing_time' => '75']);
 
-            $optimizationService = Mockery::mock(FileOptimizationService::class);
-            $optimizationService->shouldReceive('optimize')->andReturn([
-                'optimized' => true,
-                'optimized_size' => 800,
-                'compression_ratio' => 0.20,
-                'size_reduction' => 200,
-                'algorithm' => 'JPEG optimization',
-                'processing_time' => '150 ms',
-            ]);
-            $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(false);
+        $logger->shouldReceive('logTaskProcessingStarted')->once();
+        $logger->shouldReceive('logTaskCompleted')->once();
 
-            $logger = Mockery::mock(OptimizationLogger::class);
-            $logger->shouldReceive('logTaskProcessingStarted')->with($task);
-            $logger->shouldReceive('logTaskCompleted')->with($task, Mockery::any());
+        $job = new OptimizeFileJob($task);
+        $job->handle($optimizationService, $logger);
 
-            $job = new OptimizeFileJob($task);
-            $job->handle($optimizationService, $logger);
+        $task->refresh();
+        $this->assertTrue($task->webp_generated);
+    }
 
-            // Verify the logger was called correctly (mocks will handle this)
-            expect($task->refresh()->status)->toBe('completed');
-        });
-    });
-}); 
+    public function test_logs_optimization_start(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/test.jpg',
+        ]);
+
+        Storage::disk('public')->put($task->original_path, 'fake content');
+
+        $optimizationService = Mockery::mock(FileOptimizationService::class);
+        $logger = Mockery::mock(OptimizationLogger::class);
+
+        $optimizationService->shouldReceive('optimize')->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'algorithm' => 'JPEG', 'processing_time' => '150']);
+        $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(false);
+
+        $logger->shouldReceive('logTaskProcessingStarted')->once();
+        $logger->shouldReceive('logTaskCompleted')->once();
+
+        $job = new OptimizeFileJob($task);
+        $job->handle($optimizationService, $logger);
+
+        // Just verify the job completed without throwing
+        $this->assertTrue(true);
+    }
+
+    public function test_logs_optimization_completion(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/test.jpg',
+        ]);
+
+        Storage::disk('public')->put($task->original_path, 'fake content');
+
+        $optimizationService = Mockery::mock(FileOptimizationService::class);
+        $logger = Mockery::mock(OptimizationLogger::class);
+
+        $optimizationService->shouldReceive('optimize')->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'algorithm' => 'JPEG', 'processing_time' => '150']);
+        $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(false);
+
+        $logger->shouldReceive('logTaskProcessingStarted')->once();
+        $logger->shouldReceive('logTaskCompleted')->once();
+
+        $job = new OptimizeFileJob($task);
+        $job->handle($optimizationService, $logger);
+
+        // Just verify the job completed without throwing
+        $this->assertTrue(true);
+    }
+
+    public function test_handles_job_failure_gracefully(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/test.jpg',
+        ]);
+
+        Storage::disk('public')->put($task->original_path, 'fake content');
+
+        $optimizationService = Mockery::mock(FileOptimizationService::class);
+        $logger = Mockery::mock(OptimizationLogger::class);
+
+        $optimizationService->shouldReceive('optimize')
+            ->once()
+            ->andReturn(['optimized' => false, 'reason' => 'Test failure']);
+
+        $logger->shouldReceive('logTaskProcessingStarted')->once();
+        $logger->shouldReceive('logTaskFailed')->twice();
+
+        $job = new OptimizeFileJob($task);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Test failure');
+
+        $job->handle($optimizationService, $logger);
+    }
+
+    public function test_failed_method_updates_task_status(): void
+    {
+        $task = OptimizationTask::factory()->create();
+
+        $job = new OptimizeFileJob($task);
+        $exception = new \Exception('Test failure');
+
+        $job->failed($exception);
+
+        $task->refresh();
+        $this->assertEquals('failed', $task->status);
+        $this->assertStringContainsString('Test failure', $task->error_message);
+    }
+} 

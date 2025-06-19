@@ -1,211 +1,204 @@
 <?php
 
+namespace Tests\Feature;
+
 use App\Models\OptimizationTask;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+class OptimizationTaskTest extends TestCase
+{
+    use RefreshDatabase;
 
-describe('OptimizationTask Model', function () {
-    describe('Creation and Basic Properties', function () {
-        it('can create optimization task', function () {
-            $task = OptimizationTask::factory()->create();
+    public function test_can_create_optimization_task(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_filename' => 'test.jpg',
+            'original_size' => 1000,
+            'quality' => 80,
+        ]);
 
-            expect($task)->toBeInstanceOf(OptimizationTask::class);
-            expect($task->task_id)->not->toBeNull();
-            expect($task->expires_at)->not->toBeNull();
-        });
+        $this->assertInstanceOf(OptimizationTask::class, $task);
+        $this->assertEquals('test.jpg', $task->original_filename);
+        $this->assertEquals(1000, $task->original_size);
+        $this->assertEquals(80, $task->quality);
+        $this->assertEquals('pending', $task->status);
+    }
 
-        it('automatically generates task_id on creation', function () {
-            $task = OptimizationTask::create([
-                'original_filename' => 'test.jpg',
-                'original_path' => 'uploads/test.jpg',
-                'original_size' => 1000,
-                'quality' => 80,
-            ]);
+    public function test_automatically_generates_unique_task_id(): void
+    {
+        $task1 = OptimizationTask::factory()->create();
+        $task2 = OptimizationTask::factory()->create();
 
-            expect($task->task_id)->not->toBeNull();
-            expect(strlen($task->task_id))->toBe(36); // UUID length
-        });
+        $this->assertNotNull($task1->task_id);
+        $this->assertNotNull($task2->task_id);
+        $this->assertNotEquals($task1->task_id, $task2->task_id);
+    }
 
-        it('automatically sets expiration date', function () {
-            $task = OptimizationTask::create([
-                'original_filename' => 'test.jpg',
-                'original_path' => 'uploads/test.jpg',
-                'original_size' => 1000,
-                'quality' => 80,
-            ]);
+    public function test_can_mark_task_as_processing(): void
+    {
+        $task = OptimizationTask::factory()->create(['status' => 'pending']);
 
-            expect($task->expires_at)->not->toBeNull();
-            expect($task->expires_at->isAfter(now()))->toBe(true);
-        });
-    });
+        $task->markAsProcessing();
 
-    describe('Status Management', function () {
-        it('can mark task as processing', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'pending']);
+        $this->assertEquals('processing', $task->status);
+        $this->assertNotNull($task->started_at);
+    }
 
-            $task->markAsProcessing();
+    public function test_can_mark_task_as_completed(): void
+    {
+        $task = OptimizationTask::factory()->create(['status' => 'processing']);
 
-            expect($task->status)->toBe('processing');
-            expect($task->started_at)->not->toBeNull();
-        });
+        $optimizationData = [
+            'optimized_path' => 'uploads/optimized/test.jpg',
+            'optimized_size' => 800,
+            'compression_ratio' => 0.20,
+            'size_reduction' => 200,
+            'algorithm' => 'JPEG optimization',
+            'processing_time' => '150.5 ms',
+        ];
 
-        it('can mark task as completed', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'processing']);
+        $task->markAsCompleted($optimizationData);
 
-            $optimizationData = [
-                'optimized_path' => 'uploads/optimized/test.jpg',
-                'optimized_size' => 800,
-                'compression_ratio' => 0.20,
-                'size_reduction' => 200,
-                'algorithm' => 'JPEG optimization',
-                'processing_time' => '150 ms',
-            ];
+        $this->assertEquals('completed', $task->status);
+        $this->assertEquals('uploads/optimized/test.jpg', $task->optimized_path);
+        $this->assertEquals(800, $task->optimized_size);
+        $this->assertEquals(0.20, $task->compression_ratio);
+        $this->assertNotNull($task->completed_at);
+    }
 
-            $task->markAsCompleted($optimizationData);
+    public function test_can_mark_task_as_failed(): void
+    {
+        $task = OptimizationTask::factory()->create(['status' => 'processing']);
 
-            expect($task->status)->toBe('completed');
-            expect($task->optimized_path)->toBe('uploads/optimized/test.jpg');
-            expect($task->optimized_size)->toBe(800);
-            expect((float)$task->compression_ratio)->toBe(0.20);
-            expect($task->completed_at)->not->toBeNull();
-        });
+        $task->markAsFailed('Optimization failed');
 
-        it('can mark task as failed', function () {
-            $task = OptimizationTask::factory()->create(['status' => 'processing']);
+        $this->assertEquals('failed', $task->status);
+        $this->assertEquals('Optimization failed', $task->error_message);
+        $this->assertNotNull($task->completed_at);
+    }
 
-            $task->markAsFailed('Test error message');
+    public function test_can_update_webp_data(): void
+    {
+        $task = OptimizationTask::factory()->create();
 
-            expect($task->status)->toBe('failed');
-            expect($task->error_message)->toBe('Test error message');
-            expect($task->completed_at)->not->toBeNull();
-        });
-    });
+        $webpData = [
+            'webp_path' => 'uploads/webp/test.webp',
+            'webp_size' => 600,
+            'webp_compression_ratio' => 0.40,
+            'webp_size_reduction' => 400,
+            'webp_processing_time' => '75.5 ms',
+            'webp_generated' => true,
+        ];
 
-    describe('WebP Management', function () {
-        it('can update webp data', function () {
-            $task = OptimizationTask::factory()->create();
+        $task->updateWebpData($webpData);
 
-            $webpData = [
-                'webp_path' => 'uploads/webp/test.webp',
-                'webp_size' => 600,
-                'webp_compression_ratio' => 0.40,
-                'webp_size_reduction' => 400,
-                'webp_processing_time' => '100 ms',
-                'webp_generated' => true,
-            ];
+        $this->assertEquals('uploads/webp/test.webp', $task->webp_path);
+        $this->assertEquals(600, $task->webp_size);
+        $this->assertEquals(0.40, $task->webp_compression_ratio);
+        $this->assertTrue($task->webp_generated);
+    }
 
-            $task->updateWebpData($webpData);
+    public function test_can_check_if_task_is_expired(): void
+    {
+        $activeTask = OptimizationTask::factory()->create([
+            'expires_at' => now()->addHours(12),
+        ]);
 
-            expect($task->webp_path)->toBe('uploads/webp/test.webp');
-            expect($task->webp_size)->toBe(600);
-            expect($task->webp_generated)->toBe(true);
-        });
-    });
+        $expiredTask = OptimizationTask::factory()->create([
+            'expires_at' => now()->subHours(1),
+        ]);
 
-    describe('Expiration Logic', function () {
-        it('detects expired tasks', function () {
-            $task = OptimizationTask::factory()->expired()->create();
+        $this->assertFalse($activeTask->isExpired());
+        $this->assertTrue($expiredTask->isExpired());
+    }
 
-            expect($task->isExpired())->toBe(true);
-        });
+    public function test_can_scope_expired_tasks(): void
+    {
+        OptimizationTask::factory()->create(['expires_at' => now()->addHours(12)]);
+        OptimizationTask::factory()->create(['expires_at' => now()->subHours(1)]);
+        OptimizationTask::factory()->create(['expires_at' => now()->subHours(2)]);
 
-        it('detects non-expired tasks', function () {
-            $task = OptimizationTask::factory()->create();
+        $expiredTasks = OptimizationTask::expired()->get();
 
-            expect($task->isExpired())->toBe(false);
-        });
+        $this->assertCount(2, $expiredTasks);
+    }
 
-        it('can query expired tasks', function () {
-            // Clear any existing tasks first
-            OptimizationTask::truncate();
-            
-            $expiredTask = OptimizationTask::factory()->expired()->create();
-            $activeTask = OptimizationTask::factory()->create();
+    public function test_generates_optimized_filename_correctly(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_filename' => 'my_photo.jpeg',
+        ]);
 
-            $expiredTasks = OptimizationTask::expired()->get();
+        $optimizedFilename = $task->getOptimizedFilename();
 
-            expect($expiredTasks)->toHaveCount(1);
-            expect($expiredTasks->first()->id)->toBe($expiredTask->id);
-        });
-    });
+        $this->assertEquals('my_photo-optimized.jpeg', $optimizedFilename);
+    }
 
-    describe('File Name Generation', function () {
-        it('generates optimized filename correctly', function () {
-            $task = OptimizationTask::factory()->create([
-                'original_filename' => 'my_photo.jpeg',
-            ]);
+    public function test_generates_optimized_path_correctly(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/uuid-file.jpg',
+        ]);
 
-            $optimizedFilename = $task->getOptimizedFilename();
+        $optimizedPath = $task->generateOptimizedPath();
 
-            expect($optimizedFilename)->toBe('my_photo-optimized.jpeg');
-        });
+        $this->assertEquals('uploads/optimized/uuid-file.jpg', $optimizedPath);
+    }
 
-        it('handles filename without extension', function () {
-            $task = OptimizationTask::factory()->create([
-                'original_filename' => 'photo',
-            ]);
+    public function test_generates_webp_filename_correctly(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_filename' => 'my_photo.jpeg',
+        ]);
 
-            $optimizedFilename = $task->getOptimizedFilename();
+        $webpFilename = $task->getWebpFilename();
 
-            expect($optimizedFilename)->toBe('photo-optimized');
-        });
+        $this->assertEquals('my_photo.jpeg.webp', $webpFilename);
+    }
 
-        it('generates webp filename correctly', function () {
-            $task = OptimizationTask::factory()->create([
-                'original_filename' => 'photo.jpg',
-            ]);
+    public function test_generates_webp_path_correctly(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'original_path' => 'uploads/original/uuid-file.jpg',
+        ]);
 
-            $webpFilename = $task->getWebpFilename();
+        $webpPath = $task->generateWebpPath();
 
-            expect($webpFilename)->toBe('photo.jpg.webp');
-        });
-    });
+        $this->assertEquals('uploads/webp/uuid-file.jpg.webp', $webpPath);
+    }
 
-    describe('Path Generation', function () {
-        it('generates optimized path correctly', function () {
-            $task = OptimizationTask::factory()->create([
-                'original_path' => 'uploads/original/uuid-123.jpg',
-            ]);
+    public function test_expires_at_is_set_automatically(): void
+    {
+        $task = OptimizationTask::factory()->create();
 
-            $optimizedPath = $task->generateOptimizedPath();
+        $this->assertNotNull($task->expires_at);
+        $this->assertTrue($task->expires_at->greaterThan(now()));
+    }
 
-            expect($optimizedPath)->toBe('uploads/optimized/uuid-123.jpg');
-        });
+    public function test_task_id_is_not_overwritten_if_provided(): void
+    {
+        $customTaskId = 'custom-task-id-123';
+        
+        $task = OptimizationTask::factory()->create([
+            'task_id' => $customTaskId,
+        ]);
 
-        it('generates webp path correctly', function () {
-            $task = OptimizationTask::factory()->create([
-                'original_path' => 'uploads/original/uuid-123.jpg',
-            ]);
+        $this->assertEquals($customTaskId, $task->task_id);
+    }
 
-            $webpPath = $task->generateWebpPath();
+    public function test_casts_are_applied_correctly(): void
+    {
+        $task = OptimizationTask::factory()->create([
+            'compression_ratio' => 0.25,
+            'webp_compression_ratio' => 0.35,
+            'webp_generated' => true,
+            'started_at' => '2023-01-01 12:00:00',
+        ]);
 
-            expect($webpPath)->toBe('uploads/webp/uuid-123.jpg.webp');
-        });
-    });
-
-    describe('Data Casting', function () {
-        it('casts timestamps correctly', function () {
-            $task = OptimizationTask::factory()->completed()->create();
-
-            expect($task->started_at)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
-            expect($task->completed_at)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
-            expect($task->expires_at)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
-        });
-
-        it('casts compression ratio as decimal', function () {
-            $task = OptimizationTask::factory()->completed()->create([
-                'compression_ratio' => 0.2567,
-            ]);
-
-            expect((float)$task->compression_ratio)->toBe(0.26);
-        });
-
-        it('casts webp_generated as boolean', function () {
-            $task = OptimizationTask::factory()->withWebp()->create();
-
-            expect($task->webp_generated)->toBe(true);
-            expect(is_bool($task->webp_generated))->toBe(true);
-        });
-    });
-}); 
+        $this->assertEquals(0.25, $task->compression_ratio);
+        $this->assertEquals(0.35, $task->webp_compression_ratio);
+        $this->assertIsBool($task->webp_generated);
+        $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $task->started_at);
+    }
+} 

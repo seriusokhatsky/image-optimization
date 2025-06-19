@@ -1,0 +1,8 @@
+---
+description: 
+globs: *Test.php
+alwaysApply: false
+---
+All tests should use Laravel use Tests\TestCase;
+Based on classes and methods.
+Always use sail test to run tests.

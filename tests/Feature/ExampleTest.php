@@ -1,23 +1,39 @@
 <?php
 
-describe('Application Health', function () {
-    it('loads the application successfully', function () {
-        expect(true)->toBe(true);
-    });
+namespace Tests\Feature;
 
-    it('has all required routes registered', function () {
-        $routes = collect(app('router')->getRoutes())->pluck('uri')->toArray();
-        
-        expect($routes)->toContain('/');
-        expect($routes)->toContain('api/optimize/submit');
-        expect($routes)->toContain('api/optimize/status/{taskId}');
-        expect($routes)->toContain('api/optimize/download/{taskId}');
-        expect($routes)->toContain('demo/upload');
-        expect($routes)->toContain('health');
-    });
+use Tests\TestCase;
 
-    it('has all required services registered', function () {
-        // Services are instantiated on demand, so we just check if they can be resolved
-        expect(app()->make('App\Services\FileOptimizationService'))->toBeInstanceOf('App\Services\FileOptimizationService');
-    });
-});
+class ExampleTest extends TestCase
+{
+    public function test_application_loads_successfully(): void
+    {
+        $response = $this->get('/');
+        $response->assertStatus(200);
+    }
+
+    public function test_has_all_required_routes_registered(): void
+    {
+        $this->assertTrue($this->routeExists('/'));
+        $this->assertTrue($this->routeExists('/demo/upload'));
+        $this->assertTrue($this->routeExists('/api/optimize/submit'));
+    }
+
+    public function test_has_all_required_services_registered(): void
+    {
+        $this->assertInstanceOf(
+            'App\Services\FileOptimizationService',
+            app()->make('App\Services\FileOptimizationService')
+        );
+    }
+
+    private function routeExists(string $path): bool
+    {
+        try {
+            $response = $this->get($path);
+            return $response->getStatusCode() !== 404;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+}

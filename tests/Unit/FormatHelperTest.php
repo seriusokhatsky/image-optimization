@@ -1,31 +1,38 @@
 <?php
 
+namespace Tests\Unit;
+
 use App\Helpers\FormatHelper;
+use Tests\TestCase;
 
-describe('FormatHelper', function () {
-    describe('bytes formatting', function () {
-        it('formats bytes correctly', function () {
-            expect(FormatHelper::bytes(0))->toBe('0 B');
-            expect(FormatHelper::bytes(1))->toBe('1 B');
-            expect(FormatHelper::bytes(1000))->toBe('1000 B');
-            expect(FormatHelper::bytes(1024))->toBe('1.00 KB');
-            expect(FormatHelper::bytes(1536))->toBe('1.50 KB');
-            expect(FormatHelper::bytes(1048576))->toBe('1.00 MB');
-            expect(FormatHelper::bytes(1073741824))->toBe('1.00 GB');
-        });
+class FormatHelperTest extends TestCase
+{
+    public function test_formats_bytes_correctly(): void
+    {
+        $this->assertEquals('0 B', FormatHelper::bytes(0));
+        $this->assertEquals('1 B', FormatHelper::bytes(1));
+        $this->assertEquals('1000 B', FormatHelper::bytes(1000));
+        $this->assertEquals('1.00 KB', FormatHelper::bytes(1024));
+        $this->assertEquals('1.50 KB', FormatHelper::bytes(1536));
+        $this->assertEquals('1.00 MB', FormatHelper::bytes(1048576));
+        $this->assertEquals('1.00 GB', FormatHelper::bytes(1073741824));
+    }
 
-        it('handles large numbers', function () {
-            expect(FormatHelper::bytes(1099511627776))->toBe('1,024.00 GB');
-            expect(FormatHelper::bytes(5368709120))->toBe('5.00 GB');
-        });
+    public function test_handles_large_numbers(): void
+    {
+        $this->assertEquals('1,024.00 GB', FormatHelper::bytes(1099511627776));
+        $this->assertEquals('5.00 GB', FormatHelper::bytes(5368709120));
+    }
 
-        it('handles decimal precision', function () {
-            expect(FormatHelper::bytes(1536, 2))->toBe('1.50 KB');
-            expect(FormatHelper::bytes(1536, 0))->toBe('2 KB');
-        });
+    public function test_handles_decimal_precision(): void
+    {
+        $this->assertEquals('1.50 KB', FormatHelper::bytes(1536, 2));
+        $this->assertEquals('1.5 KB', FormatHelper::bytes(1536, 1));
+        $this->assertEquals('2 KB', FormatHelper::bytes(1536, 0));
+    }
 
-        it('handles negative numbers', function () {
-            expect(FormatHelper::bytes(-1024))->toBe('-1024 B');
-        });
-    });
-}); 
+    public function test_handles_negative_numbers(): void
+    {
+        $this->assertEquals('-1024 B', FormatHelper::bytes(-1024));
+    }
+} 

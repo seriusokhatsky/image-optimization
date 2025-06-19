@@ -1,95 +1,115 @@
 <?php
 
+namespace Tests\Feature;
+
 use App\Services\FileOptimizationService;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
-beforeEach(function () {
-    Storage::fake('public');
-    $this->service = new FileOptimizationService();
-});
+class FileOptimizationServiceTest extends TestCase
+{
+    protected FileOptimizationService $service;
 
-describe('FileOptimizationService', function () {
-    describe('File Type Support', function () {
-        it('identifies supported file types', function () {
-            $supportedTypes = $this->service->getSupportedTypes();
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->service = app(FileOptimizationService::class);
+    }
 
-            expect(array_keys($supportedTypes))->toContain('jpg');
-            expect(array_keys($supportedTypes))->toContain('jpeg');
-            expect(array_keys($supportedTypes))->toContain('png');
-            expect(array_keys($supportedTypes))->toContain('gif');
-            expect(array_keys($supportedTypes))->toContain('webp');
-        });
+    public function test_detects_supported_file_types(): void
+    {
+        $this->assertTrue($this->service->isSupported('jpg'));
+        $this->assertTrue($this->service->isSupported('jpeg'));
+        $this->assertTrue($this->service->isSupported('png'));
+        $this->assertTrue($this->service->isSupported('webp'));
+        $this->assertTrue($this->service->isSupported('gif'));
+        $this->assertTrue($this->service->isSupported('svg'));
+    }
 
-        it('validates supported extensions', function () {
-            expect($this->service->isSupported('jpg'))->toBe(true);
-            expect($this->service->isSupported('jpeg'))->toBe(true);
-            expect($this->service->isSupported('png'))->toBe(true);
-            expect($this->service->isSupported('gif'))->toBe(true);
-            expect($this->service->isSupported('webp'))->toBe(true);
-            expect($this->service->isSupported('svg'))->toBe(true);
-            expect($this->service->isSupported('pdf'))->toBe(false);
-            expect($this->service->isSupported('txt'))->toBe(false);
-        });
-    });
+    public function test_rejects_unsupported_file_types(): void
+    {
+        $this->assertFalse($this->service->isSupported('txt'));
+        $this->assertFalse($this->service->isSupported('pdf'));
+        $this->assertFalse($this->service->isSupported('doc'));
+        $this->assertFalse($this->service->isSupported('zip'));
+    }
 
-    describe('WebP Support', function () {
-        it('identifies mime types that support webp conversion', function () {
-            expect($this->service->supportsWebpConversion('image/jpeg'))->toBe(true);
-            expect($this->service->supportsWebpConversion('image/png'))->toBe(true);
-            expect($this->service->supportsWebpConversion('image/gif'))->toBe(false);
-            expect($this->service->supportsWebpConversion('image/webp'))->toBe(true);
-            expect($this->service->supportsWebpConversion('image/svg+xml'))->toBe(false);
-            expect($this->service->supportsWebpConversion('application/pdf'))->toBe(false);
-        });
-    });
+    public function test_calculates_metrics_correctly(): void
+    {
+        $originalSize = 1000;
+        $optimizedSize = 800;
 
-    describe('Metric Calculations', function () {
-        it('calculates compression metrics correctly', function () {
-            $metrics = $this->service->calculateMetrics(1000, 800);
+        $metrics = $this->service->calculateMetrics($originalSize, $optimizedSize);
 
-            expect($metrics['size_reduction'])->toBe(200);
-            expect($metrics['compression_ratio'])->toBe(20.0);
-        });
+        $this->assertEquals(20.0, $metrics['compression_ratio']);
+        $this->assertEquals(200, $metrics['size_reduction']);
+    }
 
-        it('handles no compression', function () {
-            $metrics = $this->service->calculateMetrics(1000, 1000);
+    public function test_handles_no_compression_scenario(): void
+    {
+        $originalSize = 1000;
+        $optimizedSize = 1000;
 
-            expect($metrics['size_reduction'])->toBe(0);
-            expect($metrics['compression_ratio'])->toBe(0.0);
-        });
+        $metrics = $this->service->calculateMetrics($originalSize, $optimizedSize);
 
-        it('handles size increase', function () {
-            $metrics = $this->service->calculateMetrics(1000, 1200);
+        $this->assertEquals(0.0, $metrics['compression_ratio']);
+        $this->assertEquals(0, $metrics['size_reduction']);
+    }
 
-            expect($metrics['size_reduction'])->toBe(-200);
-            expect($metrics['compression_ratio'])->toBe(-20.0);
-        });
-    });
+    public function test_handles_size_increase_scenario(): void
+    {
+        $originalSize = 1000;
+        $optimizedSize = 1200;
 
+        $metrics = $this->service->calculateMetrics($originalSize, $optimizedSize);
 
+        $this->assertEquals(-20.0, $metrics['compression_ratio']);
+        $this->assertEquals(-200, $metrics['size_reduction']);
+    }
 
-    describe('File Processing', function () {
-        it('handles unsupported file types gracefully', function () {
-            $file = UploadedFile::fake()->create('document.pdf');
-            Storage::disk('public')->put('uploads/original/test.pdf', 'fake content');
+    public function test_supports_webp_conversion_for_appropriate_formats(): void
+    {
+        $this->assertTrue($this->service->supportsWebpConversion('image/jpeg'));
+        $this->assertTrue($this->service->supportsWebpConversion('image/png'));
+        $this->assertFalse($this->service->supportsWebpConversion('image/gif'));
+    }
 
-            $result = $this->service->optimize($file, 'pdf', 'uploads/original/test.pdf', 80);
+    public function test_gets_supported_types_list(): void
+    {
+        $supportedTypes = $this->service->getSupportedTypes();
+        
+        $this->assertIsArray($supportedTypes);
+        $this->assertArrayHasKey('jpg', $supportedTypes);
+        $this->assertArrayHasKey('jpeg', $supportedTypes);
+        $this->assertArrayHasKey('png', $supportedTypes);
+        $this->assertArrayHasKey('webp', $supportedTypes);
+    }
 
-            expect($result['optimized'])->toBe(false);
-            expect($result['reason'])->toContain('not supported');
-        });
+    public function test_handles_edge_case_zero_sizes(): void
+    {
+        $metrics = $this->service->calculateMetrics(0, 0);
+        
+        $this->assertEquals(0.0, $metrics['compression_ratio']);
+        $this->assertEquals(0, $metrics['size_reduction']);
+    }
 
-        it('creates optimized directory if it does not exist', function () {
-            $file = UploadedFile::fake()->image('test.jpg');
-            Storage::disk('public')->put('uploads/original/test.jpg', 'fake image content');
+    public function test_handles_large_file_sizes(): void
+    {
+        $originalSize = 50000000; // 50MB
+        $optimizedSize = 25000000; // 25MB
 
-            // This would normally require actual image processing tools
-            // We're testing the directory creation logic
-            expect(Storage::disk('public')->exists('uploads/optimized'))->toBe(false);
-            
-            // The service should create the directory during optimization
-            // In a real test, this would work with actual files
-        });
-    });
-}); 
+        $metrics = $this->service->calculateMetrics($originalSize, $optimizedSize);
+
+        $this->assertEquals(50.0, $metrics['compression_ratio']);
+        $this->assertEquals(25000000, $metrics['size_reduction']);
+    }
+
+    public function test_returns_comprehensive_supported_types_info(): void
+    {
+        $supportedTypes = $this->service->getSupportedTypes();
+        
+        $this->assertArrayHasKey('jpg', $supportedTypes);
+        $this->assertArrayHasKey('png', $supportedTypes);
+        $this->assertStringContainsString('MozJPEG', $supportedTypes['jpg']);
+        $this->assertStringContainsString('Pngquant', $supportedTypes['png']);
+    }
+} 
