@@ -54,7 +54,6 @@ class OptimizationLogger
             'optimized_size' => $optimizationResult['optimized_size'],
             'compression_ratio' => $optimizationResult['compression_ratio'],
             'size_reduction' => $optimizationResult['size_reduction'],
-            'algorithm' => $optimizationResult['algorithm'],
             'processing_time' => $optimizationResult['processing_time'],
             'optimized_path' => $task->optimized_path,
             'completed_at' => now()->toISOString(),

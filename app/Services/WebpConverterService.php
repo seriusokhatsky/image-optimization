@@ -135,8 +135,6 @@ class WebpConverterService
         return in_array($mimeType, $this->_supportedMimeTypes);
     }
 
-
-
     /**
      * Generate WebP file path for storage.
      *

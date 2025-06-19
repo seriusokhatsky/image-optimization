@@ -54,7 +54,6 @@ class OptimizationTaskTest extends TestCase
             'optimized_size' => 800,
             'compression_ratio' => 0.20,
             'size_reduction' => 200,
-            'algorithm' => 'JPEG optimization',
             'processing_time' => '150.5 ms',
         ];
 

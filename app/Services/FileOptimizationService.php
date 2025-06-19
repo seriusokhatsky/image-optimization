@@ -42,7 +42,6 @@ class FileOptimizationService
         $mimeType = $file->getMimeType();
         if (!$this->isSupported($mimeType)) {
             return [
-                'algorithm' => 'Generic file compression (not optimized)',
                 'processing_time' => '0 ms',
                 'optimized' => false,
                 'reason' => 'File type not supported for image optimization'
@@ -92,7 +91,6 @@ class FileOptimizationService
                 $optimizedSize = $originalSize;
                 
                 return [
-                    'algorithm' => $this->getAlgorithmForMimeType($mimeType, $quality) . ' (reverted - no size reduction)',
                     'processing_time' => $this->calculateProcessingTime($startTime),
                     'optimized' => true,
                     'original_size' => $originalSize,
@@ -105,7 +103,6 @@ class FileOptimizationService
             }
 
             return [
-                'algorithm' => $this->getAlgorithmForMimeType($mimeType, $quality),
                 'processing_time' => $this->calculateProcessingTime($startTime),
                 'optimized' => true,
                 'original_size' => $originalSize,
@@ -121,7 +118,6 @@ class FileOptimizationService
             $optimizedPath = Storage::disk('public')->path($storedPath);
             
             return [
-                'algorithm' => 'Optimization failed - file copied without optimization',
                 'processing_time' => $this->calculateProcessingTime($startTime),
                 'optimized' => false,
                 'reason' => 'Optimization error: ' . $e->getMessage(),
@@ -132,26 +128,6 @@ class FileOptimizationService
             ];
         }
     }
-
-    /**
-     * Get optimization algorithm description for MIME type.
-     *
-     * @param string $mimeType File MIME type
-     * @param int $quality The optimization quality (1-100)
-     * @return string Algorithm description
-     */
-    private function getAlgorithmForMimeType(string $mimeType, int $quality): string
-    {
-        return match ($mimeType) {
-            'image/jpeg' => 'JPEG optimization with MozJPEG (quality ' . $quality . ')',
-            'image/png' => 'PNG optimization with Pngquant + Optipng (quality ' . $quality . ')',
-            'image/webp' => 'WebP optimization with Cwebp (quality ' . $quality . ')',
-            'image/gif' => 'GIF optimization with Gifsicle (level ' . $quality . ')',
-            default => 'Generic image optimization',
-        };
-    }
-
-
 
 
     /**

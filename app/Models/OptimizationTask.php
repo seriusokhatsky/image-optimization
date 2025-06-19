@@ -26,7 +26,7 @@ class OptimizationTask extends Model
         'webp_compression_ratio',
         'size_reduction',
         'webp_size_reduction',
-        'algorithm',
+
         'processing_time',
         'webp_processing_time',
         'webp_generated',
@@ -80,7 +80,6 @@ class OptimizationTask extends Model
             'optimized_size' => $optimizationData['optimized_size'],
             'compression_ratio' => $optimizationData['compression_ratio'],
             'size_reduction' => $optimizationData['size_reduction'],
-            'algorithm' => $optimizationData['algorithm'],
             'processing_time' => $optimizationData['processing_time'],
             'completed_at' => now(),
         ]);

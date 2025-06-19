@@ -27,7 +27,7 @@ class OptimizationTaskFactory extends Factory
             'webp_compression_ratio' => null,
             'size_reduction' => null,
             'webp_size_reduction' => null,
-            'algorithm' => null,
+
             'processing_time' => null,
             'webp_processing_time' => null,
             'webp_generated' => false,
@@ -59,7 +59,7 @@ class OptimizationTaskFactory extends Factory
                 'optimized_size' => $optimizedSize,
                 'compression_ratio' => round($sizeReduction / $originalSize, 2),
                 'size_reduction' => $sizeReduction,
-                'algorithm' => 'JPEG optimization with MozJPEG',
+    
                 'processing_time' => $this->faker->numberBetween(50, 500) . ' ms',
                 'started_at' => now()->subMinutes(2),
                 'completed_at' => now(),

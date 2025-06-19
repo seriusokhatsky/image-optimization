@@ -23,7 +23,7 @@ return new class extends Migration
             $table->integer('quality')->default(80);
             $table->decimal('compression_ratio', 5, 2)->nullable();
             $table->integer('size_reduction')->nullable();
-            $table->string('algorithm')->nullable();
+
             $table->string('processing_time')->nullable(); // in milliseconds
             $table->text('error_message')->nullable();
             $table->timestamp('started_at')->nullable();

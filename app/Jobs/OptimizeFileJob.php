@@ -67,7 +67,6 @@ class OptimizeFileJob implements ShouldQueue
                     'optimized_size' => $optimizationResult['optimized_size'],
                     'compression_ratio' => $optimizationResult['compression_ratio'],
                     'size_reduction' => $optimizationResult['size_reduction'],
-                    'algorithm' => $optimizationResult['algorithm'],
                     'processing_time' => $optimizationResult['processing_time'],
                 ]);
 

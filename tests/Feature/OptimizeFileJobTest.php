@@ -62,7 +62,6 @@ class OptimizeFileJobTest extends TestCase
                 'optimized_size' => 800000,
                 'compression_ratio' => 0.20,
                 'size_reduction' => 200000,
-                'algorithm' => 'JPEG optimization with MozJPEG',
                 'processing_time' => '150.50',
             ]);
 
@@ -126,7 +125,7 @@ class OptimizeFileJobTest extends TestCase
         $optimizationService = Mockery::mock(FileOptimizationService::class);
         $logger = Mockery::mock(OptimizationLogger::class);
 
-        $optimizationService->shouldReceive('optimize')->once()->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'algorithm' => 'JPEG', 'processing_time' => '150']);
+        $optimizationService->shouldReceive('optimize')->once()->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'processing_time' => '150']);
         $optimizationService->shouldReceive('supportsWebpConversion')->once()->andReturn(true);
         $optimizationService->shouldReceive('generateWebpCopy')->once()->andReturn(['success' => true, 'webp_path' => 'test.webp', 'webp_size' => 700000, 'webp_compression_ratio' => 0.30, 'webp_size_reduction' => 300000, 'webp_processing_time' => '75']);
 
@@ -151,7 +150,7 @@ class OptimizeFileJobTest extends TestCase
         $optimizationService = Mockery::mock(FileOptimizationService::class);
         $logger = Mockery::mock(OptimizationLogger::class);
 
-        $optimizationService->shouldReceive('optimize')->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'algorithm' => 'JPEG', 'processing_time' => '150']);
+        $optimizationService->shouldReceive('optimize')->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'processing_time' => '150']);
         $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(false);
 
         $logger->shouldReceive('logTaskProcessingStarted')->once();
@@ -175,7 +174,7 @@ class OptimizeFileJobTest extends TestCase
         $optimizationService = Mockery::mock(FileOptimizationService::class);
         $logger = Mockery::mock(OptimizationLogger::class);
 
-        $optimizationService->shouldReceive('optimize')->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'algorithm' => 'JPEG', 'processing_time' => '150']);
+        $optimizationService->shouldReceive('optimize')->andReturn(['optimized' => true, 'optimized_size' => 800000, 'compression_ratio' => 0.20, 'size_reduction' => 200000, 'processing_time' => '150']);
         $optimizationService->shouldReceive('supportsWebpConversion')->andReturn(false);
 
         $logger->shouldReceive('logTaskProcessingStarted')->once();
