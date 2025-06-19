@@ -65,8 +65,7 @@ Parameters:
     "original_file": {
       "name": "image.jpg",
       "size": 1024000
-    },
-    "estimated_completion": "2024-01-01T12:02:00Z"
+    }
   }
 }
 ```

@@ -25,7 +25,7 @@ class OptimizeController extends Controller
     public function submit(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:10240', // 10MB max
+            'file' => 'required|file|max:20480', // 20MB max
             'quality' => 'nullable|integer|min:1|max:100',
             'generate_webp' => 'nullable|boolean',
         ]);
@@ -68,7 +68,6 @@ class OptimizeController extends Controller
                     'name' => $originalName,
                     'size' => $originalSize,
                 ],
-                'estimated_completion' => now()->addMinutes(2)->toISOString(),
             ],
         ], 202); // 202 Accepted
     }
@@ -115,7 +114,7 @@ class OptimizeController extends Controller
             $response['data']['optimization'] = [
                 'compression_ratio' => $task->compression_ratio,
                 'size_reduction' => $task->size_reduction,
-                'processing_time' => $task->processing_time . ' ms',
+                'processing_time' => $task->processing_time,
                 'optimized_size' => $task->optimized_size,
             ];
 

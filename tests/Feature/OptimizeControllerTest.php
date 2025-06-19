@@ -38,7 +38,6 @@ class OptimizeControllerTest extends TestCase
                         'name',
                         'size',
                     ],
-                    'estimated_completion',
                 ],
             ])
             ->assertJson([

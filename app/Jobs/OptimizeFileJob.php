@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
 
@@ -28,7 +27,6 @@ class OptimizeFileJob implements ShouldQueue
     public function handle(FileOptimizationService $optimizationService, OptimizationLogger $logger): void
     {
         try {
-            Log::info("Starting optimization for task {$this->task->task_id}");
             $logger->logTaskProcessingStarted($this->task);
             
             // Mark task as processing
@@ -74,8 +72,6 @@ class OptimizeFileJob implements ShouldQueue
                 if ($this->task->generate_webp) {
                     $mimeType = $uploadedFile->getMimeType();
                     if ($optimizationService->supportsWebpConversion($mimeType)) {
-                        Log::info("Generating WebP copy for task {$this->task->task_id}");
-                        
                         $webpResult = $optimizationService->generateWebpCopy(
                             $actualOptimizedPath,
                             $mimeType,
@@ -91,19 +87,10 @@ class OptimizeFileJob implements ShouldQueue
                                 'webp_processing_time' => $webpResult['webp_processing_time'],
                                 'webp_generated' => true,
                             ]);
-                            
-                            Log::info("WebP copy generated successfully for task {$this->task->task_id}");
-                        } else {
-                            Log::warning("WebP generation failed for task {$this->task->task_id}: " . ($webpResult['reason'] ?? 'Unknown error'));
                         }
-                    } else {
-                        Log::info("WebP conversion not supported for MIME type {$mimeType} in task {$this->task->task_id}");
                     }
-                } else {
-                    Log::info("WebP generation disabled for task {$this->task->task_id}");
                 }
 
-                Log::info("Optimization completed for task {$this->task->task_id}");
                 $logger->logTaskCompleted($this->task, $optimizationResult);
             } else {
                 $errorMessage = $optimizationResult['reason'] ?? 'Optimization failed';
@@ -112,7 +99,6 @@ class OptimizeFileJob implements ShouldQueue
             }
 
         } catch (\Exception $e) {
-            Log::error("Optimization failed for task {$this->task->task_id}: {$e->getMessage()}");
             $logger->logTaskFailed($this->task, $e->getMessage(), $e);
             $this->task->markAsFailed($e->getMessage());
             throw $e;
@@ -121,12 +107,8 @@ class OptimizeFileJob implements ShouldQueue
 
     public function failed(\Throwable $exception): void
     {
-        Log::error("Job failed for task {$this->task->task_id}: {$exception->getMessage()}");
-        
-        // Log the final failure
         $logger = app(OptimizationLogger::class);
         $logger->logTaskFailed($this->task, $exception->getMessage(), $exception);
-        
         $this->task->markAsFailed($exception->getMessage());
     }
 } 
