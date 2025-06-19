@@ -136,7 +136,6 @@ class OptimizeControllerTest extends TestCase
                     'optimization' => [
                         'compression_ratio',
                         'size_reduction',
-                        'algorithm',
                         'processing_time',
                         'optimized_size',
                     ],

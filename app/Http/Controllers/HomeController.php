@@ -130,7 +130,6 @@ class HomeController extends Controller
                 'compression_ratio' => $task->compression_ratio,
                 'size_reduction' => $task->size_reduction,
                 'size_reduction_formatted' => FormatHelper::bytes($task->size_reduction),
-                'algorithm' => $task->algorithm,
                 'processing_time' => $task->processing_time,
                 'optimized_size' => $task->optimized_size,
                 'optimized_size_formatted' => FormatHelper::bytes($task->optimized_size),

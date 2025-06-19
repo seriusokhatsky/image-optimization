@@ -115,7 +115,6 @@ class OptimizeController extends Controller
             $response['data']['optimization'] = [
                 'compression_ratio' => $task->compression_ratio,
                 'size_reduction' => $task->size_reduction,
-                'algorithm' => $task->algorithm,
                 'processing_time' => $task->processing_time . ' ms',
                 'optimized_size' => $task->optimized_size,
             ];

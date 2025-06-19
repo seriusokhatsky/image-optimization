@@ -338,10 +338,6 @@
                                 <span class="text-gray-600">Size Reduction:</span>
                                 <span class="font-medium text-green-600">${opt.size_reduction_formatted} (${opt.compression_ratio}%)</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Algorithm:</span>
-                                <span class="font-medium text-xs">${opt.algorithm}</span>
-                            </div>
                         </div>
                     </div>
                     <div class="flex flex-col space-y-2">

@@ -21,7 +21,7 @@ class DatabaseTest extends TestCase
         $columns = [
             'id', 'task_id', 'status', 'original_filename', 'original_path',
             'original_size', 'quality', 'optimized_path', 'optimized_size',
-            'compression_ratio', 'size_reduction', 'algorithm', 'processing_time',
+            'compression_ratio', 'size_reduction', 'processing_time',
             'webp_generated', 'webp_path', 'webp_size', 'webp_compression_ratio',
             'webp_size_reduction', 'webp_processing_time', 'error_message',
             'started_at', 'completed_at', 'expires_at', 'created_at', 'updated_at'
