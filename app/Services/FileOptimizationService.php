@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Services\Optimizers\MozjpegOptimizer;
 use App\Services\WebpConverterService;
+use App\Traits\CalculatesOptimizationMetrics;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\ImageOptimizer\OptimizerChainFactory;
@@ -14,6 +15,8 @@ use Spatie\ImageOptimizer\Optimizers\Pngquant;
 
 class FileOptimizationService
 {
+    use CalculatesOptimizationMetrics;
+    
     private $optimizerChain;
     private WebpConverterService $webpConverter;
 
@@ -34,9 +37,6 @@ class FileOptimizationService
     public function optimize(UploadedFile $file, int $quality = 80): array
     {
         $startTime = microtime(true);
-        
-        // Get the full system path to the original file
-        $originalFilePath = $file->getRealPath();
         
         // Check if file type is supported for optimization
         $mimeType = $file->getMimeType();
@@ -151,34 +151,7 @@ class FileOptimizationService
         };
     }
 
-    /**
-     * Calculate processing time in milliseconds.
-     *
-     * @param float $startTime Start time from microtime(true)
-     * @return string Processing time in milliseconds with 'ms' suffix
-     */
-    private function calculateProcessingTime(float $startTime): string
-    {
-        $endTime = microtime(true);
-        $processingTime = round(($endTime - $startTime) * 1000, 2);
-        return $processingTime . ' ms';
-    }
 
-    /**
-     * Calculate compression ratio.
-     *
-     * @param int $originalSize Original file size
-     * @param int $optimizedSize Optimized file size
-     * @return float Compression ratio percentage
-     */
-    private function calculateCompressionRatio(int $originalSize, int $optimizedSize): float
-    {
-        if ($originalSize === 0) {
-            return 0.0;
-        }
-        
-        return round(($originalSize - $optimizedSize) / $originalSize * 100, 2);
-    }
 
 
     /**
@@ -196,7 +169,6 @@ class FileOptimizationService
             'image/gif',
         ]);
     }
-
 
 
     /**

@@ -8,16 +8,19 @@
 
 namespace App\Services;
 
+use App\Traits\CalculatesOptimizationMetrics;
 use Spatie\ImageOptimizer\Image;
 use Spatie\ImageOptimizer\OptimizerChain;
 use Spatie\ImageOptimizer\Optimizers\Cwebp;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 /**
  * Service for converting images to WebP format
  */
 class WebpConverterService
 {
+    use CalculatesOptimizationMetrics;
+    
     /**
      * Supported MIME types for WebP conversion
      */
@@ -43,25 +46,25 @@ class WebpConverterService
 
         try {
             // Validate source file exists
-            if (!file_exists($sourcePath)) {
+            if (!File::exists($sourcePath)) {
                 throw new \Exception("Source file not found: {$sourcePath}");
             }
 
             // Get MIME type
-            $mimeType = mime_content_type($sourcePath);
+            $mimeType = File::mimeType($sourcePath);
             if (!$this->canConvertToWebp($mimeType)) {
                 throw new \Exception("Unsupported file type for WebP conversion: {$mimeType}");
             }
 
             // Ensure output directory exists
             $outputDir = dirname($outputPath);
-            if (!is_dir($outputDir)) {
-                mkdir($outputDir, 0755, true);
+            if (!File::isDirectory($outputDir)) {
+                File::makeDirectory($outputDir, 0755, true);
             }
 
-            // Copy source to a temporary file with .webp extension for processing
+            // Copy source to output path for WebP processing
             $tempWebpPath = $outputPath;
-            copy($sourcePath, $tempWebpPath);
+            File::copy($sourcePath, $tempWebpPath);
 
             // Create custom WebP optimizer chain
             $webpOptimizer = new class(['-q', (string)$quality]) extends Cwebp {
@@ -77,35 +80,29 @@ class WebpConverterService
             $optimizerChain = (new OptimizerChain())->addOptimizer($webpOptimizer);
 
             // Get original file size
-            $originalSize = filesize($sourcePath);
+            $originalSize = File::size($sourcePath);
 
             // Convert to WebP
             $optimizerChain->optimize($tempWebpPath);
 
             // Get WebP file size
-            $webpSize = filesize($tempWebpPath);
+            $webpSize = File::size($tempWebpPath);
 
             // Check if WebP conversion actually reduced file size
             if ($webpSize >= $originalSize) {
                 // WebP is larger or same size - still provide it but flag the issue
-                $endTime = microtime(true);
-                $processingTime = round(($endTime - $startTime) * 1000, 2);
-                
                 return [
                     'success' => true,
                     'original_size' => $originalSize,
                     'webp_size' => $webpSize,
                     'size_reduction' => $originalSize - $webpSize, // Will be negative
                     'compression_ratio' => $this->calculateCompressionRatio($originalSize, $webpSize), // Will be negative
-                    'processing_time' => $processingTime . ' ms',
+                    'processing_time' => $this->calculateProcessingTime($startTime),
                     'webp_path' => $outputPath,
                     'size_increase_warning' => true,
                     'reason' => 'WebP conversion increased file size - may not be beneficial for this image'
                 ];
             }
-
-            $endTime = microtime(true);
-            $processingTime = round(($endTime - $startTime) * 1000, 2);
 
             return [
                 'success' => true,
@@ -113,18 +110,15 @@ class WebpConverterService
                 'webp_size' => $webpSize,
                 'size_reduction' => $originalSize - $webpSize,
                 'compression_ratio' => $this->calculateCompressionRatio($originalSize, $webpSize),
-                'processing_time' => $processingTime . ' ms',
+                'processing_time' => $this->calculateProcessingTime($startTime),
                 'webp_path' => $outputPath
             ];
 
         } catch (\Exception $e) {
-            $endTime = microtime(true);
-            $processingTime = round(($endTime - $startTime) * 1000, 2);
-
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
-                'processing_time' => $processingTime . ' ms',
+                'processing_time' => $this->calculateProcessingTime($startTime),
                 'webp_path' => null
             ];
         }
@@ -141,42 +135,7 @@ class WebpConverterService
         return in_array($mimeType, $this->_supportedMimeTypes);
     }
 
-    /**
-     * Get supported MIME types for WebP conversion.
-     *
-     * @return array Supported MIME types
-     */
-    public function getSupportedMimeTypes(): array
-    {
-        return $this->_supportedMimeTypes;
-    }
 
-    /**
-     * Calculate compression ratio.
-     *
-     * @param int $originalSize Original file size
-     * @param int $webpSize WebP file size
-     * @return float Compression ratio percentage
-     */
-    private function calculateCompressionRatio(int $originalSize, int $webpSize): float
-    {
-        if ($originalSize === 0) {
-            return 0.0;
-        }
-        
-        return round(($originalSize - $webpSize) / $originalSize * 100, 2);
-    }
-
-    /**
-     * Generate WebP filename from original filename.
-     *
-     * @param string $originalFilename Original filename
-     * @return string WebP filename
-     */
-    public function generateWebpFilename(string $originalFilename): string
-    {
-        return $originalFilename . '.webp';
-    }
 
     /**
      * Generate WebP file path for storage.

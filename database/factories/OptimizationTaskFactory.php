@@ -22,6 +22,7 @@ class OptimizationTaskFactory extends Factory
             'optimized_size' => null,
             'webp_size' => null,
             'quality' => 80, // Default quality - matches database default
+            'generate_webp' => false, // Default WebP generation disabled
             'compression_ratio' => null,
             'webp_compression_ratio' => null,
             'size_reduction' => null,

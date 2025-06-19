@@ -328,4 +328,63 @@ class OptimizeControllerTest extends TestCase
                 'success' => false,
             ]);
     }
+
+    public function test_can_disable_webp_generation(): void
+    {
+        Storage::fake('public');
+
+        $file = UploadedFile::fake()->image('test.jpg', 800, 600)->size(1000);
+
+        $response = $this->postJson('/api/optimize/submit', [
+            'file' => $file,
+            'quality' => 80,
+            'generate_webp' => false,
+        ]);
+
+        $response->assertStatus(202);
+
+        $taskId = $response->json('data.task_id');
+        $task = OptimizationTask::where('task_id', $taskId)->first();
+
+        $this->assertFalse($task->generate_webp);
+    }
+
+    public function test_can_enable_webp_generation(): void
+    {
+        Storage::fake('public');
+
+        $file = UploadedFile::fake()->image('test.jpg', 800, 600)->size(1000);
+
+        $response = $this->postJson('/api/optimize/submit', [
+            'file' => $file,
+            'quality' => 80,
+            'generate_webp' => true,
+        ]);
+
+        $response->assertStatus(202);
+
+        $taskId = $response->json('data.task_id');
+        $task = OptimizationTask::where('task_id', $taskId)->first();
+
+        $this->assertTrue($task->generate_webp);
+    }
+
+    public function test_webp_generation_disabled_by_default(): void
+    {
+        Storage::fake('public');
+
+        $file = UploadedFile::fake()->image('test.jpg', 800, 600)->size(1000);
+
+        $response = $this->postJson('/api/optimize/submit', [
+            'file' => $file,
+            'quality' => 80,
+        ]);
+
+        $response->assertStatus(202);
+
+        $taskId = $response->json('data.task_id');
+        $task = OptimizationTask::where('task_id', $taskId)->first();
+
+        $this->assertFalse($task->generate_webp);
+    }
 } 

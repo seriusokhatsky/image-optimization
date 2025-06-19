@@ -47,6 +47,7 @@ class OptimizeFileJobTest extends TestCase
             'original_path' => 'uploads/original/test.jpg',
             'original_size' => 1000000,
             'quality' => 80,
+            'generate_webp' => true,
         ]);
 
         Storage::disk('public')->put($task->original_path, 'fake image content');
@@ -117,6 +118,7 @@ class OptimizeFileJobTest extends TestCase
         $task = OptimizationTask::factory()->create([
             'original_path' => 'uploads/original/test.jpg',
             'original_filename' => 'test.jpg',
+            'generate_webp' => true,
         ]);
 
         Storage::disk('public')->put($task->original_path, 'fake image content');

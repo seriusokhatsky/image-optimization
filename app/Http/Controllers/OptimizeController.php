@@ -27,10 +27,12 @@ class OptimizeController extends Controller
         $request->validate([
             'file' => 'required|file|max:10240', // 10MB max
             'quality' => 'nullable|integer|min:1|max:100',
+            'generate_webp' => 'nullable|boolean',
         ]);
 
         $file = $request->file('file');
         $quality = $request->input('quality', 80);
+        $generateWebp = $request->input('generate_webp', false);
         $originalName = $file->getClientOriginalName();
         $originalSize = $file->getSize();
         $extension = $file->getClientOriginalExtension();
@@ -47,6 +49,7 @@ class OptimizeController extends Controller
             'original_path' => $originalPath,
             'original_size' => $originalSize,
             'quality' => $quality,
+            'generate_webp' => $generateWebp,
         ]);
 
         // Log task creation

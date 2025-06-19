@@ -82,6 +82,33 @@ GET /api/optimize/download/{task_id}        # Optimized version
 GET /api/optimize/download/{task_id}/webp   # WebP version
 ```
 
+## WebP Generation Control
+
+By default, the optimizer does NOT generate WebP versions of images to optimize performance. You can enable WebP generation using the `generate_webp` parameter:
+
+### Enable WebP Generation
+```bash
+curl -X POST http://localhost/api/optimize/submit \
+  -F "file=@image.jpg" \
+  -F "quality=80" \
+  -F "generate_webp=true"
+```
+
+### Disable WebP Generation (Default)
+```bash
+curl -X POST http://localhost/api/optimize/submit \
+  -F "file=@image.jpg" \
+  -F "quality=80" \
+  -F "generate_webp=false"
+```
+
+Or simply omit the parameter (defaults to `false`):
+```bash
+curl -X POST http://localhost/api/optimize/submit \
+  -F "file=@image.jpg" \
+  -F "quality=80"
+```
+
 ## Supported Formats
 
 | Format | Optimizer | Features |

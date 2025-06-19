@@ -21,6 +21,7 @@ class OptimizationTask extends Model
         'optimized_size',
         'webp_size',
         'quality',
+        'generate_webp',
         'compression_ratio',
         'webp_compression_ratio',
         'size_reduction',
@@ -43,6 +44,7 @@ class OptimizationTask extends Model
         'webp_compression_ratio' => 'decimal:2',
         'processing_time' => 'string',
         'webp_processing_time' => 'string',
+        'generate_webp' => 'boolean',
         'webp_generated' => 'boolean',
     ];
 
