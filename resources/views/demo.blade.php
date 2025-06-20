@@ -69,6 +69,19 @@
                     </div>
                 </div>
 
+                <!-- WebP Generation Option -->
+                <div class="mb-6 max-w-md mx-auto">
+                    <label class="flex items-center justify-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="webpEnabled" checked 
+                               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
+                        <span class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-file-image text-green-500 mr-1"></i>
+                            Generate WebP version
+                        </span>
+                    </label>
+                    <p class="text-xs text-gray-500 text-center mt-1">WebP provides better compression than traditional formats</p>
+                </div>
+
                 <div class="flex items-center justify-center space-x-4 text-sm text-gray-500">
                     <span><i class="fas fa-file-image text-blue-500"></i> JPEG, PNG, GIF, WebP</span>
                     <span><i class="fas fa-weight text-green-500"></i> Max 10MB</span>
@@ -149,6 +162,7 @@
         const fileInput = document.getElementById('fileInput');
         const qualitySlider = document.getElementById('qualitySlider');
         const qualityValue = document.getElementById('qualityValue');
+        const webpEnabled = document.getElementById('webpEnabled');
         const uploadQueue = document.getElementById('uploadQueue');
         const queueItems = document.getElementById('queueItems');
         const errorContainer = document.getElementById('errorContainer');
@@ -162,6 +176,12 @@
         // Prevent quality slider area from triggering file upload
         const qualityContainer = qualitySlider.closest('.mb-6');
         qualityContainer.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // Prevent WebP checkbox area from triggering file upload
+        const webpContainer = webpEnabled.closest('.mb-6');
+        webpContainer.addEventListener('click', function(e) {
             e.stopPropagation();
         });
 
@@ -226,6 +246,7 @@
             const formData = new FormData();
             formData.append('file', file);
             formData.append('quality', qualitySlider.value);
+            formData.append('generate_webp', webpEnabled.checked ? '1' : '0');
             formData.append('_token', csrfToken);
 
             const queueItem = createQueueItem(file);
@@ -347,7 +368,7 @@
                         </button>
             `;
 
-            if (data.webp && data.webp.webp_size) {
+            if (data.webp && data.webp.webp_size && data.webp.webp_size > 0) {
                 html += `
                         <button onclick="downloadFile('${data.task_id}', 'webp')" 
                                 class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">

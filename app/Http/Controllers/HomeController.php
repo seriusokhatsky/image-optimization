@@ -49,10 +49,12 @@ class HomeController extends Controller
         $request->validate([
             'file' => 'required|file|mimes:jpg,jpeg,png,gif,webp|max:10240', // 10MB max
             'quality' => 'nullable|integer|min:1|max:100',
+            'generate_webp' => 'nullable|boolean',
         ]);
 
         $file = $request->file('file');
         $quality = $request->input('quality', 80);
+        $generateWebp = $request->boolean('generate_webp', true);
         $originalName = $file->getClientOriginalName();
         $originalSize = $file->getSize();
         $extension = $file->getClientOriginalExtension();
@@ -69,6 +71,7 @@ class HomeController extends Controller
             'original_path' => $originalPath,
             'original_size' => $originalSize,
             'quality' => $quality,
+            'generate_webp' => $generateWebp,
         ]);
 
         // Log task creation
