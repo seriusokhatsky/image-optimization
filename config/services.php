@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'xtemos' => [
+        'api_url' => env('XTEMOS_API_URL', 'https://xtemos.com/api'),
+        'api_key' => env('XTEMOS_API_KEY'),
+    ],
+
 ];

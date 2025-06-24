@@ -28,13 +28,17 @@ class OptimizeController extends Controller
             'file' => 'required|file|max:20480', // 20MB max
             'quality' => 'nullable|integer|min:1|max:100',
             'generate_webp' => 'nullable|boolean',
+            'token' => 'required|string',
         ]);
 
         $file = $request->file('file');
         $quality = $request->input('quality', 80);
         $generateWebp = $request->input('generate_webp', false);
+        $quota = $request->get('quota'); // Set by middleware
+        
         $originalName = $file->getClientOriginalName();
         $originalSize = $file->getSize();
+        $sizeKb = ceil($originalSize / 1024); // More precise KB calculation
         $extension = $file->getClientOriginalExtension();
 
         // Generate unique filename for storage
@@ -52,6 +56,9 @@ class OptimizeController extends Controller
             'generate_webp' => $generateWebp,
         ]);
 
+        // Update quota usage
+        $quota->addUsage($sizeKb);
+
         // Log task creation
         $this->logger->logTaskCreated($task);
 
@@ -67,6 +74,12 @@ class OptimizeController extends Controller
                 'original_file' => [
                     'name' => $originalName,
                     'size' => $originalSize,
+                ],
+                'quota_info' => [
+                    'used_mb' => $quota->used_mb,
+                    'remaining_mb' => $quota->remaining_quota_mb,
+                    'limit_mb' => $quota->current_quota_mb,
+                    'last_updated' => $quota->last_quota_check?->toISOString(),
                 ],
             ],
         ], 202); // 202 Accepted
@@ -152,6 +165,120 @@ class OptimizeController extends Controller
         }
 
         return response()->json($response);
+    }
+
+    /**
+     * Get quota information for a license
+     */
+    public function quota(Request $request): JsonResponse
+    {
+        $token = $request->header('X-Token') ?? $request->input('token');
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Token required',
+                'code' => 'TOKEN_REQUIRED'
+            ], 401);
+        }
+
+        $quota = \App\Models\LicenseQuota::getOrCreate($token);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $token,
+                'quota_mb' => $quota->current_quota_mb,
+                'used_mb' => $quota->used_mb,
+                'remaining_mb' => $quota->remaining_quota_mb,
+                'last_used_at' => $quota->last_used_at?->toISOString(),
+                'last_quota_check' => $quota->last_quota_check?->toISOString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Refresh quota from API
+     */
+    public function refreshQuota(Request $request): JsonResponse
+    {
+        $token = $request->header('X-Token') ?? $request->input('token');
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Token required',
+                'code' => 'TOKEN_REQUIRED'
+            ], 401);
+        }
+
+        $quotaService = app(\App\Services\QuotaService::class);
+        $quotaInfo = $quotaService->getUserQuota($token);
+
+        if (!$quotaInfo['valid']) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid token',
+                'code' => 'TOKEN_INVALID'
+            ], 403);
+        }
+
+        $quota = \App\Models\LicenseQuota::getOrCreate($token);
+        $quota->updateQuota($quotaInfo['quota_mb']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quota refreshed successfully',
+            'data' => [
+                'token' => $token,
+                'quota_mb' => $quota->current_quota_mb,
+                'used_mb' => $quota->used_mb,
+                'remaining_mb' => $quota->remaining_quota_mb,
+                'subscription_type' => $quotaInfo['subscription_type'] ?? null,
+                'last_quota_check' => $quota->last_quota_check?->toISOString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Reset quota usage for specific license
+     */
+    public function resetUsage(Request $request): JsonResponse
+    {
+        $token = $request->header('X-Token') ?? $request->input('token');
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Token required',
+                'code' => 'TOKEN_REQUIRED'
+            ], 401);
+        }
+
+        $quota = \App\Models\LicenseQuota::where('token', $token)->first();
+        
+        if (!$quota) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Token not found',
+                'code' => 'TOKEN_NOT_FOUND'
+            ], 404);
+        }
+
+        $oldUsageMb = $quota->used_mb;
+        $quota->update(['used_kb' => 0]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Usage reset successfully',
+            'data' => [
+                'token' => $token,
+                'old_usage_mb' => $oldUsageMb,
+                'new_usage_mb' => 0,
+                'quota_mb' => $quota->current_quota_mb,
+                'remaining_mb' => $quota->current_quota_mb,
+            ],
+        ]);
     }
 
     /**
