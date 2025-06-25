@@ -172,17 +172,8 @@ class OptimizeController extends Controller
      */
     public function quota(Request $request): JsonResponse
     {
-        $token = $request->header('X-Token') ?? $request->input('token');
-
-        if (!$token) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Token required',
-                'code' => 'TOKEN_REQUIRED'
-            ], 401);
-        }
-
-        $quota = \App\Models\LicenseQuota::getOrCreate($token);
+        $token = $request->get('token'); // Set by middleware
+        $quota = $request->get('quota'); // Set by middleware
 
         return response()->json([
             'success' => true,

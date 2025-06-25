@@ -8,7 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class QuotaMiddleware
+class QuotaValidationMiddleware
 {
     public function __construct(
         private QuotaService $quotaService
@@ -16,8 +16,6 @@ class QuotaMiddleware
 
     /**
      * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -31,9 +29,31 @@ class QuotaMiddleware
             ], 401);
         }
 
-        $quota = LicenseQuota::getOrCreate($token);
+        // Check if quota record exists for this token
+        $quota = LicenseQuota::where('token', $token)->first();
+        
+        if (!$quota) {
+            // First request for this token - fetch quota from API
+            $quotaInfo = $this->quotaService->getUserQuota($token);
+            
+            if (!$quotaInfo['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid token or quota service unavailable',
+                    'code' => 'TOKEN_INVALID'
+                ], 403);
+            }
+            
+            // Create quota record with fetched quota
+            $quota = LicenseQuota::create([
+                'token' => $token,
+                'used_kb' => 0,
+                'current_quota_kb' => $quotaInfo['quota_mb'] * 1024,
+                'last_quota_check' => now(),
+            ]);
+        }
 
-        // Check if quota is available (quotas are now only updated via manual refresh endpoint)
+        // Validate quota availability for operations that consume quota
         if ($quota->current_quota_kb <= 0) {
             return response()->json([
                 'success' => false,

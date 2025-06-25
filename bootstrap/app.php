@@ -14,7 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'image.rate.limit' => \App\Http\Middleware\ImageUploadRateLimit::class,
-            'quota' => \App\Http\Middleware\QuotaMiddleware::class,
+            'quota.fetch' => \App\Http\Middleware\QuotaFetchMiddleware::class,
+        'quota.validate' => \App\Http\Middleware\QuotaValidationMiddleware::class,
         ]);
     })
     ->withProviders([
